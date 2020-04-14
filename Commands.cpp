@@ -180,7 +180,7 @@ void SmallShell::executeCommand(const char *cmd_line)
 
 void ChpromptCommand::execute()
 {
-  base();
+  base.execute(); //calls BuiltInCommand::execute
   char* new_smash = smash; 
   if(argc >= 1)
   {
