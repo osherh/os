@@ -166,8 +166,11 @@ vector<string> Command::split(char* to_split, const char* seperator)
 
 void BuiltInCommand::execute()
 { 
-  const char* whitespace_regex = "\\s+";
-  cmd_arr = split(cmd_line, whitespace_regex);
+  int length_line = strlen(cmd_line);
+  char copy_cmd_line[length_line+1];
+  strcpy(copy_cmd_line , cmd_line);
+  char* token;
+  token = strtok(copy_cmd_line," ");
 }
 
 void SmallShell::executeCommand(const char *cmd_line)
@@ -181,14 +184,46 @@ void SmallShell::executeCommand(const char *cmd_line)
 void ChpromptCommand::execute()
 {
   base.execute(); //calls BuiltInCommand::execute
-  char* new_smash = smash; 
-  if(argc >= 1)
+  char* new_smash = smash;
+  char* end_of_prompt ="> ";
+  int count=0;
+  while (token != NULL)
   {
-    new_smash = argv[0];   
-  }
-  else  //reset
+   if (count == 0) //pass the first word(because its chprompt)
+   { 
+       token = strtok(NULL, " ");
+       count++;
+       continue;
+   }
+   else if (count == 1) //the next prompt we need to print
+   {
+   strcpy(new_smash , token);
+   count++;
+   break;
+   }
+   if (count == 1)
   {
-    new_smash = "smash> ";
+    new_smash = "smash";
   }
+  strncat(new_smash, end_of_prompt, 2);
   smash = new_smash;
+}
+
+void ShowPidCommand::execute()
+{
+   std::cout <<"smash pid is "<< ::getpid() << std::endl;
+}
+
+void GetCurrDirCommand::execute()
+{
+ char buff[80];
+ std::cout << getcwd(buff,80) << std::endl;
+}
+
+void CdCommand::execute()
+{
+  base.execute();
+
+
+
 }
