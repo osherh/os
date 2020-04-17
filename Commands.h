@@ -7,7 +7,7 @@
 #define COMMAND_MAX_ARGS (20)
 #define HISTORY_MAX_RECORDS (50)
 
-char* smash = "smash> ";
+char smash[80] = "smash> ";
 
 class Command {
 // TODO: Add your data members

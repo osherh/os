@@ -184,7 +184,7 @@ void SmallShell::executeCommand(const char *cmd_line)
 void ChpromptCommand::execute()
 {
   base.execute(); //calls BuiltInCommand::execute
-  char* new_smash = smash;
+  char new_smash= smash;
   char* end_of_prompt ="> ";
   int count=0;
   while (token != NULL)
@@ -206,7 +206,6 @@ void ChpromptCommand::execute()
     new_smash = "smash";
   }
   strncat(new_smash, end_of_prompt, 2);
-  smash = new_smash;
 }
 
 void ShowPidCommand::execute()
