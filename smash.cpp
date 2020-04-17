@@ -5,7 +5,7 @@
 #include "Commands.h"
 #include "signals.h"
 
-char smash[80] = "smash> ";
+char *smash = "smash> ";
 
 int main(int argc, char* argv[]) {
     if(signal(SIGTSTP , ctrlZHandler)==SIG_ERR) {
