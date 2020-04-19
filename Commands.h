@@ -89,6 +89,7 @@ class FgCommand : public BuiltInCommand {
 };
 
 class JobsList;
+
 class QuitCommand : public BuiltInCommand {
 // TODO: Add your data members public:
   QuitCommand(const char* cmd_line, JobsList* jobs);
@@ -117,9 +118,19 @@ class HistoryCommand : public BuiltInCommand {
   void execute() override;
 };
 
-class JobsList {
+class JobsList 
+{
+ list<JobEntry> jobs_list;
  public:
-  class JobEntry {
+  class JobEntry 
+  {
+    public:
+      int pid;
+      int job_id;
+      bool was_stopped; //by SigStop
+      bool is_done;
+      char* command;
+      time_t inserted_time;
    // TODO: Add your data members
   };
  // TODO: Add your data members
