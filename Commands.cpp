@@ -482,3 +482,27 @@ void ExternalCommand::execute()
 
   //TODO - wait, waitpid are blocking syscalls. Note that wait() syscall will block unless WHOHANG is given in the options
 }
+
+QuitCommand::QuitCommand(const char* cmd_line, JobsList* jobs)
+{
+  this.jobs = jobs;
+}
+
+void QuitCommand::execute()
+{
+  base.execute();
+  int count = 0;
+  char* token = strtok(NULL, " ");
+  if(token == NULL) //no args given, just quit cmd
+  {
+    exit(1);
+  }
+  else
+  {
+    if(strcmp(token, "kill") == 0)
+    {
+      jobs->killAllJobs();
+      exit(1)
+    }
+  }
+}
