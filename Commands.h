@@ -14,7 +14,7 @@ class Command {
  public:
   const char* cmd_line;
   char* oldpath = "0";
-   char* token;
+  char* token;
   Command(const char* cmd_line);
   virtual ~Command();
   virtual void execute() = 0;

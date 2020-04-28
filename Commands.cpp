@@ -152,27 +152,11 @@ Command * SmallShell::CreateCommand(const char* cmd_line)
   return NULL;
 }
 
-/*
-char*[] Command::split(char* to_split, const char* seperator)
-{
-    char*[] arr;
-    char* current = strtok(to_split, seperator);
-    int i = 0;
-    while(current != NULL)
-    {
-        arr[i++] = current;
-        current = strtok(NULL, seperator);
-    }
-    return arr;
-}
-*/
-
 void BuiltInCommand::execute()
 { 
   int length_line = strlen(cmd_line);
   char copy_cmd_line[length_line+1];
   strcpy(copy_cmd_line , cmd_line);
-  char* token;
   token = strtok(copy_cmd_line," ");
 }
 
@@ -219,58 +203,73 @@ void ShowPidCommand::execute()
 void GetCurrDirCommand::execute()
 {
  char buff[80];
- std::cout << getcwd(buff,80) << std::endl;
+ char* curr_working_dir = getcwd(buff,80);
+ if(curr_working_dir == NULL)
+ {
+    syscall_failed_msg("getcwd");
+ }
+ std::cout << curr_working_dir << std::endl;
 }
 
 void CdCommand::execute()
 {
   base.execute();
  
- char* path;
+  char* path;
   char* newpath;
   char* to_oldpath ="-"; 
   char buffer[80];
   path = getcwd(buffer,80);
+  if(path == NULL)
+  {
+    syscall_failed_msg("getcwd");
+  }
+  int count=0;
+
   while(token != NULL)
   {
     if (count== 0)
     {
       token = strtok(NULL, " ");
-       count++;
-       continue;
-  }
+      count++;
+      continue;
+    }
     else if(count==1)
     {
       count ++;
       strcpy(newpath , token);
       token = strtok(NULL, " ");
-  }
+    }
     else if(count == 2)
     {
       perror("smash error: cd: too many arguments");
       return;
     }
   }
-  if (strcmp(newpath,to_oldpath)== 0)
-    {
-     if (strcmp(oldpath,"0")==0)
+  if(strcmp(newpath,to_oldpath) == 0)
+  {
+     if(strcmp(oldpath,"0") == 0)
      {
-      perror("smash error: cd: OLDPWD not set"); 
+        perror("smash error: cd: OLDPWD not set"); 
      }
      else 
      {
-     int number_check = chdir(oldpath);
-     strcpy(oldpath, path);
-   }
+        int number_check = chdir(oldpath);
+        if(number_check == -1)
+        {
+          syscall_failed_msg("chdir");
+        }
+        strcpy(oldpath, path);
     }
-  else if(chdir(newpath != 0) //TODO - fix
-    { 
-     perror("there is no such existing path");
-    }
+  }
+  else if(chdir(newpath != 0))
+  { 
+    perror("there is no such existing path");
+  }
   else
-    {
-   strcpy(oldpath, path);
-    } 
+  {
+    strcpy(oldpath, path);
+  } 
 }
 
 JobEntry* JobsList::getLastJob(int* lastJobId)
@@ -305,35 +304,31 @@ JobEntry* JobsList::getJobById(int jobId)
   return NULL;
 }
 
+void syscall_failed_msg(char* syscall_name)
+{
+  perror("smash error: " + syscall_failed_msg + " failed");
+}
+
+void send_signal(pid_t pid, int signal)
+{
+    if(kill(pid, signal) != 0)
+    {
+      syscall_failed_msg("kill");
+    }
+}
+
 void JobsList::killAllJobs()
 {
   for(JobEntry* job_entry : jobs_list)
   {
-    kill(job_entry->pid, SIGKILL);
+    send_signal(job_entry->pid, SIGKILL)
   }
 }
-
 
 bool process_status_is_done(pid_t pid)
 {
   int status;
-  pid_t return_pid = waitpid(process_id, &status, WNOHANG);
-  if (return_pid == -1) 
-  {
-      //error
-      //TODO - check it
-      exit(1);
-  } 
-  else if (return_pid == 0) 
-  {
-    //child is still running
-    return false;
-  }
-  else if (return_pid == process_id) 
-  {
-    //child is finished. exit status in status
-    return true;
-  }
+  return waitpid(pid, &status, WNOHANG) > 0;
 }
 
 bool less_than_by_job_id(const JobEntry* &a, const JobEntry* &b)
@@ -352,7 +347,6 @@ void JobsList::addJob(Command* cmd, bool isStopped = false)
         int max_job_id = *max_job_id_it;
         job_id = max_job_id + 1;
       }
-      //TODO - check if this is the pid we need to insert
       pid_t pid = getpid();
       bool is_done = process_status_is_done(pid);
       JobEntry* job_entry = new JobEntry(pid, job_id, iStopped, is_done, cmd->cmd_line, time(NULL))
@@ -389,8 +383,87 @@ void JobsList::printJobsList()
     {
       job_stream << " (stopped)";
     }
-    cout << job_stream.c_str(); //osher - fix 
+    cout << job_stream.c_str(); //TODO - fix 
   }
+}
+
+void KillCommand::execute()
+{
+  base.execute(); //calls BuiltInCommand::execute
+
+  char* signal; // "-" followed by signal_num
+  int count = 0;
+  int sig_num = 0;
+
+  //check how many args are given
+  while(token != NULL)  
+  { 
+    token = strtok(NULL, " ");
+    count++;
+    continue;
+  }
+  
+  strtok(cmd_line, " "); //reset the pointer
+
+  if(count > 2)
+  {
+    perror("smash error: kill: invalid arguments");
+  }
+  else
+  {
+    count = 0;
+    //handle the cases
+    while(token != NULL)
+    {
+      if(count== 0)  //cmd
+      {
+        token = strtok(NULL, " ");
+        if(token == NULL) //there are no args for kill command
+        {
+          perror("smash error: kill: invalid arguments");
+        }
+        count++;
+        continue;
+      }
+      else if(count == 1) //signal
+      {
+        count++;      
+        strcpy(signal, token);
+        token = strtok(NULL, " ");
+        if(token == NULL) //there is no job_id specified
+        {
+          perror("smash error: kill: invalid arguments");
+        }
+        if(0 != strcmp(signal[0],"-"))
+        {
+          perror("smash error: kill: invalid arguments");
+        }
+        else
+        {
+          char* signal_num;
+          signal_num = strtok(signal, "-");
+          sig_num = atoi(signal_num);
+          if(sig_num < 1 || sig_num > 31) // if signal_num isnt a number then sig_num == 0   
+          {
+            perror("smash error: kill: invalid arguments");
+          }
+        }
+      }
+      else if(count == 2) // we have both signal and job_id
+      {
+        int job_id = atoi(token);
+        JobEntry* job_found = getJobById(job_id); //TODO - instance method, fix call
+        if(job_found == NULL)
+        {
+          perror("smash error: kill: job-id " + job_id + " does not exist");
+        }
+        send_signal(job_found->pid, sig_num);
+        stringstream kill_stream << "signal " << sig_num << " was sent to pid " << job_found->pid;
+        cout << job_kill.c_str(); //TODO - fix 
+        token = NULL;
+      }
+    } //end while
+  } //end else (we got 2 or less args)
 }
 
 void ExternalCommand::execute()
