@@ -402,5 +402,4 @@ void ExternalCommand::execute()
 	}
 
   //TODO - wait, waitpid are blocking syscalls. Note that wait() syscall will block unless WHOHANG is given in the options
->>>>>>> dev
 }
