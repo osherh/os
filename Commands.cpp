@@ -225,9 +225,51 @@ void GetCurrDirCommand::execute()
 void CdCommand::execute()
 {
   base.execute();
-
-
-
+  char* path;
+  char* newpath;
+  char* to_oldpath ="-"; 
+  char buffer[80];
+  path = getcwd(buffer,80);
+  while(token != NULL)
+  {
+    if (count== 0)
+    {
+      token = strtok(NULL, " ");
+       count++;
+       continue;
+	}
+    else if(count==1)
+    {
+      count ++;
+      strcpy(newpath , token);
+      token = strtok(NULL, " ");
+	}
+    else if(count == 2)
+    {
+      perror("smash error: cd: too many arguments");
+      return;
+    }
+  }
+  if (strcmp(newpath,to_oldpath)== 0)
+    {
+     if (strcmp(oldpath,"0")==0)
+     {
+      perror("smash error: cd: OLDPWD not set"); 
+     }
+     else 
+     {
+     int number_check = chdir(oldpath);
+     strcpy(oldpath, path);
+	 }
+    }
+  else if(chdir(newpath != 0)
+    { 
+     perror("there is no such existing path");
+    }
+  else
+    {
+   strcpy(oldpath, path);
+    }
 }
 
 //TODO - check if calls delete or dtor

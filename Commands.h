@@ -13,6 +13,7 @@ class Command {
 // TODO: Add your data members
  public:
   const char* cmd_line;
+  char* oldpath = "0";
   Command(const char* cmd_line);
   virtual ~Command();
   virtual void execute() = 0;
