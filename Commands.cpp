@@ -172,7 +172,6 @@ void BuiltInCommand::execute()
   int length_line = strlen(cmd_line);
   char copy_cmd_line[length_line+1];
   strcpy(copy_cmd_line , cmd_line);
-  char* token;
   token = strtok(copy_cmd_line," ");
 }
 
