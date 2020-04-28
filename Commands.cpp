@@ -149,7 +149,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line)
   {
     return new ExternalCommand(cmd_line);
   }
-  return nullptr;
+  return NULL;
 }
 
 /*
@@ -225,54 +225,92 @@ void GetCurrDirCommand::execute()
 void CdCommand::execute()
 {
   base.execute();
-  char* path;
-  char* newpath;
-  char* to_oldpath ="-"; 
-  char buffer[80];
-  path = getcwd(buffer,80);
-  while(token != NULL)
-  {
-    if (count== 0)
-    {
-      token = strtok(NULL, " ");
-       count++;
-       continue;
-	}
-    else if(count==1)
-    {
-      count ++;
-      strcpy(newpath , token);
-      token = strtok(NULL, " ");
-	}
-    else if(count == 2)
-    {
-      perror("smash error: cd: too many arguments");
-      return;
-    }
-  }
-  if (strcmp(newpath,to_oldpath)== 0)
-    {
-     if (strcmp(oldpath,"0")==0)
-     {
-      perror("smash error: cd: OLDPWD not set"); 
-     }
-     else 
-     {
-     int number_check = chdir(oldpath);
-     strcpy(oldpath, path);
-	 }
-    }
-  else if(chdir(newpath != 0)
-    { 
-     perror("there is no such existing path");
-    }
-  else
-    {
-   strcpy(oldpath, path);
-    }
+  
+  
 }
 
-//TODO - check if calls delete or dtor
+JobEntry* JobsList::getLastJob(int* lastJobId)
+{
+  list<JobEntry*>::reverse_iterator last_it = jobs_list.rbegin();
+  *lastJobId = curr_job->job_id;
+  return *last_it;
+}
+
+JobEntry* JobsList::getLastStoppedJob(int *jobId)
+{
+  for (list<JobEntry*>::reverse_iterator rit = jobs_list.rbegin(); rit != jobs_list.rend(); ++rit)
+  {
+    JobEntry* curr_job = *rit;
+    if(curr_job->is_stopped)
+    {
+      *jobId = curr_job->job_id;
+      return curr_job;
+    }
+  }
+}
+
+JobEntry* JobsList::getJobById(int jobId)
+{
+  for(JobEntry* job_entry : jobs_list)
+  {
+    if(job_entry->job_id == jobId)
+    {
+      return job_entry;
+    }
+  }
+  return NULL;
+}
+
+void JobsList::killAllJobs()
+{
+  for(JobEntry* job_entry : jobs_list)
+  {
+    kill(job_entry->pid, SIGKILL);
+  }
+}
+
+
+bool process_status_is_done(pid_t pid)
+{
+  int status;
+  pid_t return_pid = waitpid(process_id, &status, WNOHANG);
+  if (return_pid == -1) 
+  {
+      //error
+      //TODO - check it
+      exit(1);
+  } 
+  else if (return_pid == 0) 
+  {
+    //child is still running
+    return false;
+  }
+  else if (return_pid == process_id) 
+  {
+    //child is finished. exit status in status
+    return true;
+  }
+}
+
+void JobsList::addJob(Command* cmd, bool isStopped = false)
+{
+      removeFinishedJobs();
+      
+      int job_id = 1;
+      if(!jobs_list.empty())     
+      {
+        int max_job_id = ;
+        job_id = max_job_id + 1;
+      }
+      //TODO - check if this is the pid we need to insert
+      pid_t pid = getpid();
+      bool is_done = process_status_is_done(pid);
+      JobEntry* job_entry = new JobEntry(pid, job_id, iStopped, is_done, cmd->cmd_line, time(NULL))
+      jobs_list.push_back(job_entry);
+}
+
+//TODO: call before executing any command
+//TODO: check if calls delete or dtor
 void JobsList::removeJobById(int job_id)
 {
 	jobs_list.remove_if(entry => entry.job_id);
@@ -280,11 +318,11 @@ void JobsList::removeJobById(int job_id)
 
 void JobsList::removeFinishedJobs()
 {
-	for(JobEntry job_entry : jobs_list)
+	for(JobEntry* job_entry : jobs_list)
 	{
-		if(job_entry.is_done)
+		if(job_entry->is_done)
 		{
-			jobs_list.removeJobById(job_entry.job_id);
+			jobs_list.removeJobById(job_entry->job_id);
 		}
 	}
 }
@@ -292,12 +330,17 @@ void JobsList::removeFinishedJobs()
 void JobsList::printJobsList()
 {
 	removeFinishedJobs();
-	for(JobEntry job_entry : jobs_list)
+	for(JobEntry* job_entry : jobs_list)
 	{
 		time_t curr_time = time(NULL);
-		double time_elapsed = difftime(curr_time, job_entry.inserted_time); 
-		cout << "[" << job_entry.job_id << "]" << job_entry.command << " : " << job_entry.pid << " " << time_elapsed << " secs";
-	}
+		double time_elapsed = difftime(curr_time, job_entry->inserted_time); 
+		stringstream job_stream << "[" << job_entry->job_id << "]" << job_entry->command << " : " << job_entry->pid << " " << time_elapsed << " secs";
+	  if(job_entry->is_stopped)
+    {
+      job_stream << " (stopped)";
+    }
+    cout << job_stream.c_str(); //osher - fix 
+  }
 }
 
 void ExternalCommand::execute()
@@ -310,7 +353,9 @@ void ExternalCommand::execute()
 	}
 	else //getpid() == 0) //son
 	{
-		char*[] args = new char*[2] {"-c", cmd_line};
+		char*[] args = new char*[3] {"-c", cmd_line, NULL};
 		execv("/bin/bash", args);
 	}
+
+  //TODO - wait, waitpid are blocking syscalls. Note that wait() syscall will block unless WHOHANG is given in the options
 }
