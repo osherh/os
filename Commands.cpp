@@ -386,6 +386,16 @@ void JobsList::printJobsList()
     cout << job_stream.c_str(); //TODO - fix 
   }
 }
+bool JobsList::joblist_is_empty()
+{
+  int count_job=0;
+  for(JobEntry* job_entry : jobs_list)
+  {
+  count_job++;
+  break;
+  }
+  return count_job == 0;
+}
 
 void KillCommand::execute()
 {
@@ -505,4 +515,71 @@ void QuitCommand::execute()
       exit(1)
     }
   }
+}
+
+void FgCommnad::execute()
+{
+base.execute()
+int count = 0;
+char* check_number;
+int job_number;
+JobEntry* wanted_job;
+while(token!=NULL)
+{
+  count++;
+  token=strtok(NULL," ");
+}
+if (count > 3)
+{
+    perror("smash error: fg: invalid arguments")
+}
+else if (count == 1)
+{
+  bool is_empty = joblist_is_empty();
+  if (is_empty == true)
+  {
+    perror("smash error: fg: jobs list is empty");
+  }
+  else
+  {
+   int last_job_id;
+   wanted_job = getLastJob(&last_job_id);
+   send_signal(wanted_job->pid, SIGCONT);
+   stringstream job_stream << wanted_job->command << " : " << wanted_job->pid << " " << endl;
+   waitpid(wanted_job->pid, NULL, 0);
+   removeJobById(wanted_job->job_id);
+   return;
+  }
+}
+strtok(cmd_line, " ");
+count = 0;
+while(token!=NULL)
+{
+  count++;
+  token=strtok(NULL," ");
+  if (count == 1 & token!=NULL)
+  {
+    strcpy(check_number,token);
+    job_number = atoi(check_number);
+    if (job_number == 0 )
+    {
+     perror("smash error: fg: invalid arguments")
+	}
+    else
+    {
+      wanted_job = getJobById(job_number);
+      if (wanted_job == NULL)
+      {
+       perror("smash error: fg: job-id"+ job_number +"does not exist");
+	  }
+      else
+      {
+       send_signal(wanted_job->pid, SIGCONT);
+       stringstream job_stream << wanted_job->command << " : " << wanted_job->pid << " " << endl;
+       waitpid(wanted_job->pid, NULL, 0);
+       removeJobById(wanted_job->job_id);
+	  }
+    }
+  }
+}
 }
