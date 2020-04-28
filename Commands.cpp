@@ -336,6 +336,11 @@ bool process_status_is_done(pid_t pid)
   }
 }
 
+bool less_than_by_job_id(const JobEntry* &a, const JobEntry* &b)
+{
+    return a->job_id < b->job_id;
+}
+
 void JobsList::addJob(Command* cmd, bool isStopped = false)
 {
       removeFinishedJobs();
@@ -343,7 +348,8 @@ void JobsList::addJob(Command* cmd, bool isStopped = false)
       int job_id = 1;
       if(!jobs_list.empty())     
       {
-        int max_job_id = ;
+        auto max_job_id_it = max_element(jobs_list.begin(), jobs_list.end(), less_than_by_job_id);
+        int max_job_id = *max_job_id_it;
         job_id = max_job_id + 1;
       }
       //TODO - check if this is the pid we need to insert
