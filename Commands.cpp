@@ -152,17 +152,20 @@ Command * SmallShell::CreateCommand(const char* cmd_line)
   return nullptr;
 }
 
-vector<string> Command::split(char* to_split, const char* seperator)
+/*
+char*[] Command::split(char* to_split, const char* seperator)
 {
-    vector<string> arr;
-    char* current = strtok(to_split, seperator.c_str());
+    char*[] arr;
+    char* current = strtok(to_split, seperator);
+    int i = 0;
     while(current != NULL)
     {
-        arr.push_back(current);
+        arr[i++] = current;
         current = strtok(NULL, seperator);
     }
     return arr;
 }
+*/
 
 void BuiltInCommand::execute()
 { 
@@ -225,4 +228,47 @@ void CdCommand::execute()
 
 
 
+}
+
+//TODO - check if calls delete or dtor
+void JobsList::removeJobById(int job_id)
+{
+	jobs_list.remove_if(entry => entry.job_id);
+}
+
+void JobsList::removeFinishedJobs()
+{
+	for(JobEntry job_entry : jobs_list)
+	{
+		if(job_entry.is_done)
+		{
+			jobs_list.removeJobById(job_entry.job_id);
+		}
+	}
+}
+
+void JobsList::printJobsList()
+{
+	removeFinishedJobs();
+	for(JobEntry job_entry : jobs_list)
+	{
+		time_t curr_time = time(NULL);
+		double time_elapsed = difftime(curr_time, job_entry.inserted_time); 
+		cout << "[" << job_entry.job_id << "]" << job_entry.command << " : " << job_entry.pid << " " << time_elapsed << " secs";
+	}
+}
+
+void ExternalCommand::execute()
+{
+	fork();
+	int pid = getpid(); 
+	if(pid > 0) //father
+	{
+		waitpid(pid, NULL, WNOHANG); //pid is the son pid
+	}
+	else //getpid() == 0) //son
+	{
+		char*[] args = new char*[2] {"-c", cmd_line};
+		execv("/bin/bash", args);
+	}
 }
