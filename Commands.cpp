@@ -491,19 +491,53 @@ void KillCommand::execute()
 
 void ExternalCommand::execute()
 {
+    base.execute();
+    char* signal_bg;
+    int index=0;
+    bool need_to_wait=true;
+    while(token!=NULL)
+    {
+     strcpy(signal_bg,token);
+     token=strtok(NULL," ");
+     if(token==NULL)
+     {
+      while(signal_bg[index]!=NULL)
+      {
+       char sig_bg=signal_bg[index];
+       index++; 
+       if(signal_bg[index]==NULL)
+       {
+        if(sig_bg=='&')
+        {
+         need_to_wait=false;
+		}
+	   } 
+	  }
+	 }
+    }
 	fork();
-	int pid = getpid(); 
+	int pid = getpid();
 	if(pid > 0) //father
 	{
-		waitpid(pid, NULL, WNOHANG); //pid is the son pid
+        if(need_to_wait==false)
+        {
+         addJob(cmd);
+		}
+		else
+        {
+         waitpid(pid, NULL, 0); //pid is the son pid
+        }
 	}
-	else //getpid() == 0) //son
+	else if (pid == 0) //son
 	{
-		char*[] args = new char*[3] {"-c", cmd_line, NULL};
+		char*[4] args= {"bash", "-c", cmd_line, NULL};
 		execv("/bin/bash", args);
 	}
-
-  //TODO - wait, waitpid are blocking syscalls. Note that wait() syscall will block unless WHOHANG is given in the options
+    else
+    { 
+     perror("can't execute the command");
+    }
+ //TODO - wait, waitpid are blocking syscalls. Note that wait() syscall will block unless WHOHANG is given in the options
 }
 
 QuitCommand::QuitCommand(const char* cmd_line, JobsList* jobs)
