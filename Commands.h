@@ -150,6 +150,7 @@ class JobsList
   JobEntry * getLastJob(int* lastJobId);
   JobEntry *getLastStoppedJob(int *jobId);
   bool joblist_is_empty();
+  bool stopped_joblist_is_empty();
   // TODO: Add extra methods or modify exisitng ones as needed
 };
 

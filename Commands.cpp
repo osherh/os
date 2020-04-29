@@ -132,12 +132,12 @@ Command * SmallShell::CreateCommand(const char* cmd_line)
 
  else if(cmd_s.find("fg") == 0) //7
   {
-    return new FgCommnad(cmd_line);    
+    return new FgCommand(cmd_line);    
   }
 
  else if(cmd_s.find("bg") == 0) //8
   {
-    return new BgCommnad(cmd_line);    
+    return new BgCommand(cmd_line);    
   }
 
  else if(cmd_s.find("quit") == 0) //9
@@ -396,6 +396,19 @@ bool JobsList::joblist_is_empty()
   }
   return count_job == 0;
 }
+bool JobsList::stopped_joblist_is_empty()
+{
+  int count_stopped_job=0;
+  for(JobEntry* job_entry : jobs_list)
+  {
+   if(job_entry->was_stopped == true)
+   {
+    count_job++;
+    break;
+   }
+  }
+  return count_job == 0;
+}
 
 void KillCommand::execute()
 {
@@ -517,44 +530,44 @@ void QuitCommand::execute()
   }
 }
 
-void FgCommnad::execute()
+void FgCommand::execute()
 {
-base.execute()
-int count = 0;
-char* check_number;
-int job_number;
-JobEntry* wanted_job;
-while(token!=NULL)
-{
+ base.execute();
+ int count = 0;
+ char* check_number;
+ int job_number;
+ JobEntry* wanted_job;
+ while(token!=NULL)
+ {
   count++;
   token=strtok(NULL," ");
-}
-if (count > 3)
-{
+ }
+ if (count > 3)
+ {
     perror("smash error: fg: invalid arguments")
-}
-else if (count == 1)
-{
-  bool is_empty = joblist_is_empty();
-  if (is_empty == true)
-  {
+ }
+ else if (count == 1)
+ {
+   bool is_empty = joblist_is_empty();
+   if (is_empty == true)
+   {
     perror("smash error: fg: jobs list is empty");
-  }
-  else
-  {
-   int last_job_id;
-   wanted_job = getLastJob(&last_job_id);
-   send_signal(wanted_job->pid, SIGCONT);
-   stringstream job_stream << wanted_job->command << " : " << wanted_job->pid << " " << endl;
-   waitpid(wanted_job->pid, NULL, 0);
-   removeJobById(wanted_job->job_id);
-   return;
-  }
-}
-strtok(cmd_line, " ");
-count = 0;
-while(token!=NULL)
-{
+   }
+   else
+   {
+    int last_job_id;
+    wanted_job = getLastJob(&last_job_id);
+    send_signal(wanted_job->pid, SIGCONT);
+    stringstream job_stream << wanted_job->command << " : " << wanted_job->pid << " " << endl;
+    waitpid(wanted_job->pid, NULL, 0);
+    removeJobById(wanted_job->job_id);
+    return;
+   }
+ }
+ strtok(cmd_line, " ");
+ count = 0;
+ while(token!=NULL)
+ {
   count++;
   token=strtok(NULL," ");
   if (count == 1 & token!=NULL)
@@ -581,5 +594,73 @@ while(token!=NULL)
 	  }
     }
   }
+ }
 }
+
+void BgCommand::execute()
+{ base.execute();
+  int count = 0;
+  char* check_num;
+  int job_num;
+  JobEntry* stopped_job;
+  while(token!=NULL)
+  {
+   count++;
+   token=strtok(NULL," ");
+  }
+  if (count > 3)
+  {
+    perror("smash error: bg: invalid arguments")
+  }
+  else if(count==1)
+  {
+   bool is_empty = stopped_joblist_is_empty();
+   if (is_empty == true)
+   {
+    perror("smash error: bg: there is no stopped jobs to resume");
+   }
+   else
+   {
+    int last_stopped_job_id;
+    stopped_job = getLastStoppedJob(&last_stopped_job_id);
+    send_signal(stopped_job->pid, SIGCONT);
+    stringstream job_stream << stopped_job->command << " : " << stopped_job->pid << " " << endl;
+    stopped_job->was_stopped = false;
+    return;
+   }
+  }
+  strtok(cmd_line, " ");
+  count = 0;
+  while(token!=NULL)
+  {
+   count++;
+   token=strtok(NULL," ");
+   if (count == 1 & token!=NULL)
+   {
+    strcpy(check_num,token);
+    job_num = atoi(check_num);
+    if (job_num == 0 )
+    {
+     perror("smash error: bg: invalid arguments")
+	}
+    else
+    {
+     stopped_job = getJobById(job_num);
+     if (stopped_job == NULL)
+     {
+      perror("smash error: bg: job-id " + job_num + " does not exist");
+	 }
+     else if(stopped_job->was_stopped == false )
+     {
+      perror("smash error: bg: job-id " + job_num + " is already running in the background");
+     }
+     else
+     {
+      send_signal(stopped_job->pid, SIGCONT);
+      stringstream job_stream << stopped_job->command << " : " << stopped_job->pid << " " << endl;
+      stopped_job->was_stopped = false;
+	 }
+    }
+   }
+  }
 }
