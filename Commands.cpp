@@ -542,11 +542,11 @@ void FgCommand::execute()
   count++;
   token=strtok(NULL," ");
  }
- if (count > 3)
+ if (count > 3) //TODO >2
  {
     perror("smash error: fg: invalid arguments")
  }
- else if (count == 1)
+ else if (count == 1) //no args given
  {
    bool is_empty = joblist_is_empty();
    if (is_empty == true)
@@ -556,7 +556,7 @@ void FgCommand::execute()
    else
    {
     int last_job_id;
-    wanted_job = getLastJob(&last_job_id);
+    wanted_job = getLastJob(&last_job_id); //TODO - make sure this is the job with the highest job id
     send_signal(wanted_job->pid, SIGCONT);
     stringstream job_stream << wanted_job->command << " : " << wanted_job->pid << " " << endl;
     waitpid(wanted_job->pid, NULL, 0);
@@ -564,6 +564,10 @@ void FgCommand::execute()
     return;
    }
  }
+
+ //TODO - the if else structure isnt well defined, else clause is missing
+
+ //job_id is given
  strtok(cmd_line, " ");
  count = 0;
  while(token!=NULL)
@@ -577,21 +581,21 @@ void FgCommand::execute()
     if (job_number == 0 )
     {
      perror("smash error: fg: invalid arguments")
-	}
+	  }
     else
     {
       wanted_job = getJobById(job_number);
       if (wanted_job == NULL)
       {
-       perror("smash error: fg: job-id"+ job_number +"does not exist");
-	  }
+        perror("smash error: fg: job-id"+ job_number +"does not exist");
+	    }
       else
       {
        send_signal(wanted_job->pid, SIGCONT);
        stringstream job_stream << wanted_job->command << " : " << wanted_job->pid << " " << endl;
        waitpid(wanted_job->pid, NULL, 0);
        removeJobById(wanted_job->job_id);
-	  }
+	    }
     }
   }
  }
