@@ -576,7 +576,7 @@ void FgCommand::execute()
   count++;
   token=strtok(NULL," ");
  }
- if (count > 3) //TODO >2
+ if (count > 2) //TODO >2
  {
     perror("smash error: fg: invalid arguments")
  }
