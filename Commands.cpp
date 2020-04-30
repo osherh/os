@@ -194,6 +194,7 @@ void ChpromptCommand::execute()
     new_smash = "smash";
   }
   strncat(new_smash, end_of_prompt, 2);
+ }
 }
 
 void ShowPidCommand::execute()
@@ -546,7 +547,7 @@ void ExternalCommand::execute()
 
 QuitCommand::QuitCommand(const char* cmd_line, JobsList* jobs)
 {
-  this.jobs = jobs;
+  this->jobs = jobs;
 }
 
 void QuitCommand::execute()
