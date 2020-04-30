@@ -5,21 +5,31 @@
 
 using namespace std;
 
-//Ctrl+Z -> shell sends SIGTSTP to the process in foreground
 void ctrlZHandler(int sig_num) 
 {
-	// TODO: Add your implementation
+	cout << "smash: got ctrl-Z";
+	jobs->addStoppedJob(fg_pid, fg_command);
+	if(fg_pid! = -1)
+	{
+		if(kill(fg_pid, SIGSTOP) != 0)
+    	{
+     		syscall_failed_msg("kill");
+    	}
+	}
+	cout << "smash: process " + fg_pid + " was stopped";
 }
 
-//Ctrl+C -> shell sends SIGINT to the process in foreground
 void ctrlCHandler(int sig_num)
 {
 	cout << "smash: got ctrl-C";
-	if(fg_process_pid! = -1)
+	if(fg_pid! = -1)
 	{
-		kill(fg_process_pid, sig_num);
+		if(kill(fg_pid, SIGKILL) != 0)
+    	{
+     		syscall_failed_msg("kill");
+    	}
 	}
-	cout << "smash: process <foreground-PID> was killed";
+	cout << "smash: process " + fg_pid + " was killed";
 }
 
 void alarmHandler(int sig_num) 

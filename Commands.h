@@ -8,6 +8,9 @@
 #define HISTORY_MAX_RECORDS (50)
 
 char *smash = "smash> ";
+pid_t fg_pid;
+char* fg_command;
+JobsList* jobs;
 
 class Command {
 // TODO: Add your data members
@@ -28,6 +31,7 @@ class BuiltInCommand : public Command {
  public:
   BuiltInCommand(const char* cmd_line);
   virtual ~BuiltInCommand() {}
+  void execute() override;
 };
 
 class ExternalCommand : public Command {
@@ -129,19 +133,19 @@ class JobsList
   class JobEntry 
   {
     public:
-      int pid;
+      pid_t pid;
       int job_id;
-      bool was_stopped; //by SigStop
+      bool is_stopped;
       bool is_done;
       char* command;
       time_t inserted_time;
-   // TODO: Add your data members
   };
  // TODO: Add your data members
  public:
   JobsList();
   ~JobsList();
   void addJob(Command* cmd, bool isStopped = false);
+  void addStoppedJob(pid_t pid, char* cmd);
   void printJobsList();
   void killAllJobs();
   void removeFinishedJobs();

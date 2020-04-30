@@ -10,8 +10,7 @@
 
 using namespace std;
 
-pid_t fg_process_pid;
-JobsList* jobs = new JobsList(); 
+jobs = new JobsList(); 
 
 const std::string WHITESPACE = " \n\r\t\f\v";
 
@@ -335,20 +334,23 @@ bool process_status_is_done(pid_t pid)
   return waitpid(pid, &status, WNOHANG) > 0;
 }
 
-bool less_than_by_job_id(const JobEntry* &a, const JobEntry* &b)
+void JobEntry::JobEntry(pid_t pid, int job_id, bool is_stopped, bool is_done, char* command, time_t inserted_time)
 {
-    return a->job_id < b->job_id;
+  this->pid = pid;
+  this->job_id = job_id;
+  this->is_stopped = is_stopped;
+  this->is_done = is_done;
+  this->command = command;
+  this->inserted_time = inserted_time;
 }
 
 void JobsList::addJob(Command* cmd, bool isStopped = false)
 {
       jobs->removeFinishedJobs();
-      
       int job_id = 1;
-      if(!jobs_list.empty())     
+      if(!jobs_list.empty()) 
       {
-        auto max_job_id_it = max_element(jobs_list.begin(), jobs_list.end(), less_than_by_job_id);
-        int max_job_id = *max_job_id_it;
+        int job_id = jobs_list->getLastJob()->job_id + 1;
         job_id = max_job_id + 1;
       }
       pid_t pid = getpid();
@@ -357,7 +359,19 @@ void JobsList::addJob(Command* cmd, bool isStopped = false)
       jobs_list.push_back(job_entry);
 }
 
-//TODO: call before executing any command
+void JobsList::addStoppedJob(pid_t pid, char* cmd)
+{
+      jobs->removeFinishedJobs();
+      int job_id = 1;
+      if(!jobs_list.empty())
+      {
+        int job_id = jobs_list->getLastJob()->job_id + 1;
+        job_id = max_job_id + 1;
+      }
+      JobEntry* job_entry = new JobEntry(pid, job_id, true, false, cmd, time(NULL))
+      jobs_list.push_back(job_entry);        
+}
+
 //TODO: check if calls delete or dtor
 void JobsList::removeJobById(int job_id)
 {
@@ -400,7 +414,7 @@ bool JobsList::stopped_joblist_is_empty()
   int count_stopped_job=0;
   for(JobEntry* job_entry : jobs_list)
   {
-   if(job_entry->was_stopped == true)
+   if(job_entry->is_stopped == true)
    {
     count_job++;
     break;
@@ -530,9 +544,11 @@ void ExternalCommand::execute()
 		    }
 		    else //foreground
         {
-          fg_process_pid = pid;
+          fg_pid = pid;
+          fg_command = cmd_line;
           waitpid(pid, NULL, 0); //pid is the son pid
-          fg_process_pid = -1;
+          fg_pid = -1;
+          fg_command = "";
         }
 	   }
 	   else if (pid == 0) //son
@@ -593,11 +609,13 @@ void FgCommand::execute()
    {
     int last_job_id;
     wanted_job = jobs->getLastJob(&last_job_id); //TODO - make sure this is the job with the highest job id
-    fg_process_pid = wanted_job->pid;
+    fg_pid = wanted_job->pid;
+    fg_command = cmd_line;
     send_signal(wanted_job->pid, SIGCONT);
     stringstream job_stream << wanted_job->command << " : " << wanted_job->pid << " " << endl;
     waitpid(wanted_job->pid, NULL, 0);
-    fg_process_pid = -1;
+    fg_pid = -1;
+    fg_command = "";
     jobs->removeJobById(wanted_job->job_id);
     return;
    }
@@ -629,11 +647,13 @@ void FgCommand::execute()
 	    }
       else
       {
-       fg_process_pid = wanted_job->pid;
+       fg_pid = wanted_job->pid;
+       fg_command = cmd_line;
        send_signal(wanted_job->pid, SIGCONT);
        stringstream job_stream << wanted_job->command << " : " << wanted_job->pid << " " << endl;
        waitpid(wanted_job->pid, NULL, 0);
-       fg_process_pid = -1;
+       fg_pid = -1;
+       fg_command = "";
        jobs->removeJobById(wanted_job->job_id);
 	    }
     }
@@ -669,7 +689,7 @@ void BgCommand::execute()
     stopped_job = jobs->getLastStoppedJob(&last_stopped_job_id);
     send_signal(stopped_job->pid, SIGCONT);
     stringstream job_stream << stopped_job->command << " : " << stopped_job->pid << " " << endl;
-    stopped_job->was_stopped = false;
+    stopped_job->is_stopped = false;
     return;
    }
   }
@@ -694,7 +714,7 @@ void BgCommand::execute()
      {
       perror("smash error: bg: job-id " + job_num + " does not exist");
 	 }
-     else if(stopped_job->was_stopped == false )
+     else if(stopped_job->is_stopped == false )
      {
       perror("smash error: bg: job-id " + job_num + " is already running in the background");
      }
@@ -702,7 +722,7 @@ void BgCommand::execute()
      {
       send_signal(stopped_job->pid, SIGCONT);
       stringstream job_stream << stopped_job->command << " : " << stopped_job->pid << " " << endl;
-      stopped_job->was_stopped = false;
+      stopped_job->is_stopped = false;
 	 }
     }
    }
