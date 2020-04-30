@@ -94,9 +94,9 @@ class JobsList;
 
 class QuitCommand : public BuiltInCommand 
 {
-  JobsList* jobs;
   public:
-    QuitCommand(const char* cmd_line, JobsList* jobs);
+    //QuitCommand(const char* cmd_line, JobsList* jobs);
+    QuitCommand(const char* cmd_line);
     virtual ~QuitCommand() {}
     void execute() override;
 };
@@ -149,7 +149,7 @@ class JobsList
   void removeJobById(int jobId);
   JobEntry * getLastJob(int* lastJobId);
   JobEntry *getLastStoppedJob(int *jobId);
-  bool joblist_is_empty();
+  bool isEmpty();
   bool stopped_joblist_is_empty();
   // TODO: Add extra methods or modify exisitng ones as needed
 };
@@ -157,7 +157,8 @@ class JobsList
 class JobsCommand : public BuiltInCommand {
  // TODO: Add your data members
  public:
-  JobsCommand(const char* cmd_line, JobsList* jobs);
+  //JobsCommand(const char* cmd_line, JobsList* jobs);
+  JobsCommand(const char* cmd_line);
   virtual ~JobsCommand() {}
   void execute() override;
 };
@@ -165,7 +166,8 @@ class JobsCommand : public BuiltInCommand {
 class KillCommand : public BuiltInCommand {
  // TODO: Add your data members
  public:
-  KillCommand(const char* cmd_line, JobsList* jobs);
+  //KillCommand(const char* cmd_line, JobsList* jobs);
+  KillCommand(const char* cmd_line);
   virtual ~KillCommand() {}
   void execute() override;
 };
@@ -173,7 +175,8 @@ class KillCommand : public BuiltInCommand {
 class ForegroundCommand : public BuiltInCommand {
  // TODO: Add your data members
  public:
-  ForegroundCommand(const char* cmd_line, JobsList* jobs);
+  ForegroundCommand(const char* cmd_line);
+  //ForegroundCommand(const char* cmd_line, JobsList* jobs);
   virtual ~ForegroundCommand() {}
   void execute() override;
 };
@@ -181,7 +184,8 @@ class ForegroundCommand : public BuiltInCommand {
 class BackgroundCommand : public BuiltInCommand {
  // TODO: Add your data members
  public:
-  BackgroundCommand(const char* cmd_line, JobsList* jobs);
+  BackgroundCommand(const char* cmd_line);
+  //BackgroundCommand(const char* cmd_line, JobsList* jobs);
   virtual ~BackgroundCommand() {}
   void execute() override;
 };

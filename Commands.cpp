@@ -11,6 +11,8 @@
 using namespace std;
 
 pid_t fg_process_pid;
+JobsList* jobs = new JobsList(); 
+
 const std::string WHITESPACE = " \n\r\t\f\v";
 
 #if 0
@@ -340,7 +342,7 @@ bool less_than_by_job_id(const JobEntry* &a, const JobEntry* &b)
 
 void JobsList::addJob(Command* cmd, bool isStopped = false)
 {
-      removeFinishedJobs();
+      jobs->removeFinishedJobs();
       
       int job_id = 1;
       if(!jobs_list.empty())     
@@ -368,14 +370,14 @@ void JobsList::removeFinishedJobs()
 	{
 		if(job_entry->is_done)
 		{
-			jobs_list.removeJobById(job_entry->job_id);
+			jobs->removeJobById(job_entry->job_id);
 		}
 	}
 }
 
 void JobsList::printJobsList()
 {
-	removeFinishedJobs();
+	jobs->removeFinishedJobs();
 	for(JobEntry* job_entry : jobs_list)
 	{
 		time_t curr_time = time(NULL);
@@ -388,16 +390,11 @@ void JobsList::printJobsList()
     cout << job_stream.c_str(); //TODO - fix 
   }
 }
-bool JobsList::joblist_is_empty()
+bool JobsList::isEmpty()
 {
-  int count_job=0;
-  for(JobEntry* job_entry : jobs_list)
-  {
-  count_job++;
-  break;
-  }
-  return count_job == 0;
+  return jobs_list.empty();
 }
+
 bool JobsList::stopped_joblist_is_empty()
 {
   int count_stopped_job=0;
@@ -410,6 +407,11 @@ bool JobsList::stopped_joblist_is_empty()
    }
   }
   return count_job == 0;
+}
+
+void JobsCommand::execute()
+{
+  jobs->printJobsList();
 }
 
 void KillCommand::execute()
@@ -477,7 +479,7 @@ void KillCommand::execute()
       else if(count == 2) // we have both signal and job_id
       {
         int job_id = atoi(token);
-        JobEntry* job_found = getJobById(job_id); //TODO - instance method, fix call
+        JobEntry* job_found = jobs->getJobById(job_id);
         if(job_found == NULL)
         {
           perror("smash error: kill: job-id " + job_id + " does not exist");
@@ -524,7 +526,7 @@ void ExternalCommand::execute()
 	   {
         if(need_to_wait == false)
         {
-         addJob(this);
+         jobs->addJob(this);
 		    }
 		    else //foreground
         {
@@ -543,11 +545,6 @@ void ExternalCommand::execute()
      { 
         perror("can't execute the command");
      }
-}
-
-QuitCommand::QuitCommand(const char* cmd_line, JobsList* jobs)
-{
-  this->jobs = jobs;
 }
 
 void QuitCommand::execute()
@@ -581,13 +578,13 @@ void FgCommand::execute()
   count++;
   token=strtok(NULL," ");
  }
- if (count > 2) //TODO >2
+ if (count > 2)
  {
     perror("smash error: fg: invalid arguments")
  }
  else if (count == 1) //no args given
  {
-   bool is_empty = joblist_is_empty();
+   bool is_empty = jobs->isEmpty();
    if (is_empty == true)
    {
     perror("smash error: fg: jobs list is empty");
@@ -595,13 +592,13 @@ void FgCommand::execute()
    else
    {
     int last_job_id;
-    wanted_job = getLastJob(&last_job_id); //TODO - make sure this is the job with the highest job id
+    wanted_job = jobs->getLastJob(&last_job_id); //TODO - make sure this is the job with the highest job id
     fg_process_pid = wanted_job->pid;
     send_signal(wanted_job->pid, SIGCONT);
     stringstream job_stream << wanted_job->command << " : " << wanted_job->pid << " " << endl;
     waitpid(wanted_job->pid, NULL, 0);
     fg_process_pid = -1;
-    removeJobById(wanted_job->job_id);
+    jobs->removeJobById(wanted_job->job_id);
     return;
    }
  }
@@ -625,7 +622,7 @@ void FgCommand::execute()
 	  }
     else
     {
-      wanted_job = getJobById(job_number);
+      wanted_job = jobs->getJobById(job_number);
       if (wanted_job == NULL)
       {
         perror("smash error: fg: job-id"+ job_number +"does not exist");
@@ -637,7 +634,7 @@ void FgCommand::execute()
        stringstream job_stream << wanted_job->command << " : " << wanted_job->pid << " " << endl;
        waitpid(wanted_job->pid, NULL, 0);
        fg_process_pid = -1;
-       removeJobById(wanted_job->job_id);
+       jobs->removeJobById(wanted_job->job_id);
 	    }
     }
   }
@@ -661,7 +658,7 @@ void BgCommand::execute()
   }
   else if(count==1)
   {
-   bool is_empty = stopped_joblist_is_empty();
+   bool is_empty = jobs->stopped_joblist_is_empty();
    if (is_empty == true)
    {
     perror("smash error: bg: there is no stopped jobs to resume");
@@ -669,7 +666,7 @@ void BgCommand::execute()
    else
    {
     int last_stopped_job_id;
-    stopped_job = getLastStoppedJob(&last_stopped_job_id);
+    stopped_job = jobs->getLastStoppedJob(&last_stopped_job_id);
     send_signal(stopped_job->pid, SIGCONT);
     stringstream job_stream << stopped_job->command << " : " << stopped_job->pid << " " << endl;
     stopped_job->was_stopped = false;
@@ -692,7 +689,7 @@ void BgCommand::execute()
 	}
     else
     {
-     stopped_job = getJobById(job_num);
+     stopped_job = jobs->getJobById(job_num);
      if (stopped_job == NULL)
      {
       perror("smash error: bg: job-id " + job_num + " does not exist");
