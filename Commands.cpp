@@ -10,6 +10,7 @@
 
 using namespace std;
 
+pid_t fg_process_pid;
 const std::string WHITESPACE = " \n\r\t\f\v";
 
 #if 0
@@ -491,53 +492,56 @@ void KillCommand::execute()
 
 void ExternalCommand::execute()
 {
+    //TODO: add strtok call
     base.execute();
-    char* signal_bg;
-    int index=0;
-    bool need_to_wait=true;
-    while(token!=NULL)
+    
+    char* bg_sign;
+    int index = 0;
+    bool need_to_wait = true;
+    while(token != NULL)
     {
-     strcpy(signal_bg,token);
-     token=strtok(NULL," ");
-     if(token==NULL)
-     {
-      while(signal_bg[index]!=NULL)
+      strcpy(bg_sign, token);
+      token = strtok(NULL, " ");
+      if(token == NULL)
       {
-       char sig_bg=signal_bg[index];
-       index++; 
-       if(signal_bg[index]==NULL)
-       {
-        if(sig_bg=='&')
+        while(bg_sign[index] != NULL)
         {
-         need_to_wait=false;
-		}
-	   } 
-	  }
-	 }
+          char sig_bg = bg_sign[index];
+          index++; 
+          if(bg_sign[index] == NULL)
+          {
+            if(sig_bg == '&')
+            {
+              need_to_wait = false;
+		        }
+	        } 
+	      }
+	    }
     }
-	fork();
-	int pid = getpid();
-	if(pid > 0) //father
-	{
-        if(need_to_wait==false)
+	   int pid = fork();
+	   if(pid > 0) //father
+	   {
+        if(need_to_wait == false)
         {
-         addJob(cmd);
-		}
-		else
+         addJob(this);
+		    }
+		    else //foreground
         {
-         waitpid(pid, NULL, 0); //pid is the son pid
+          fg_process_pid = pid;
+          waitpid(pid, NULL, 0); //pid is the son pid
+          fg_process_pid = -1;
         }
-	}
-	else if (pid == 0) //son
-	{
-		char*[4] args= {"bash", "-c", cmd_line, NULL};
-		execv("/bin/bash", args);
-	}
-    else
-    { 
-     perror("can't execute the command");
-    }
- //TODO - wait, waitpid are blocking syscalls. Note that wait() syscall will block unless WHOHANG is given in the options
+	   }
+	   else if (pid == 0) //son
+	   {
+        setpgrp();
+		    char*[4] args= {"bash", "-c", cmd_line, NULL};
+		    execv("/bin/bash", args);
+	   }
+     else
+     { 
+        perror("can't execute the command");
+     }
 }
 
 QuitCommand::QuitCommand(const char* cmd_line, JobsList* jobs)
@@ -591,9 +595,11 @@ void FgCommand::execute()
    {
     int last_job_id;
     wanted_job = getLastJob(&last_job_id); //TODO - make sure this is the job with the highest job id
+    fg_process_pid = wanted_job->pid;
     send_signal(wanted_job->pid, SIGCONT);
     stringstream job_stream << wanted_job->command << " : " << wanted_job->pid << " " << endl;
     waitpid(wanted_job->pid, NULL, 0);
+    fg_process_pid = -1;
     removeJobById(wanted_job->job_id);
     return;
    }
@@ -625,9 +631,11 @@ void FgCommand::execute()
 	    }
       else
       {
+       fg_process_pid = wanted_job->pid;
        send_signal(wanted_job->pid, SIGCONT);
        stringstream job_stream << wanted_job->command << " : " << wanted_job->pid << " " << endl;
        waitpid(wanted_job->pid, NULL, 0);
+       fg_process_pid = -1;
        removeJobById(wanted_job->job_id);
 	    }
     }

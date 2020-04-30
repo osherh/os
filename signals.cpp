@@ -5,15 +5,24 @@
 
 using namespace std;
 
-void ctrlZHandler(int sig_num) {
+//Ctrl+Z -> shell sends SIGTSTP to the process in foreground
+void ctrlZHandler(int sig_num) 
+{
 	// TODO: Add your implementation
 }
 
-void ctrlCHandler(int sig_num) {
-  // TODO: Add your implementation
+//Ctrl+C -> shell sends SIGINT to the process in foreground
+void ctrlCHandler(int sig_num)
+{
+	cout << "smash: got ctrl-C";
+	if(fg_process_pid! = -1)
+	{
+		kill(fg_process_pid, sig_num);
+	}
+	cout << "smash: process <foreground-PID> was killed";
 }
 
-void alarmHandler(int sig_num) {
+void alarmHandler(int sig_num) 
+{
   // TODO: Add your implementation
 }
-
