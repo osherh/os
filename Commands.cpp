@@ -350,7 +350,7 @@ void JobsList::addJob(Command* cmd, bool isStopped = false)
       int job_id = 1;
       if(!jobs_list.empty()) 
       {
-        int job_id = jobs_list->getLastJob()->job_id + 1;
+        int job_id = jobs->getLastJob()->job_id + 1;
         job_id = max_job_id + 1;
       }
       pid_t pid = getpid();
@@ -365,7 +365,7 @@ void JobsList::addStoppedJob(pid_t pid, char* cmd)
       int job_id = 1;
       if(!jobs_list.empty())
       {
-        int job_id = jobs_list->getLastJob()->job_id + 1;
+        int job_id = jobs->getLastJob()->job_id + 1;
         job_id = max_job_id + 1;
       }
       JobEntry* job_entry = new JobEntry(pid, job_id, true, false, cmd, time(NULL))
