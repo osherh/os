@@ -320,12 +320,21 @@ void send_signal(pid_t pid, int signal)
     }
 }
 
+//TODO: add endl where needed
+
 void JobsList::killAllJobs()
 {
+  size_t size = jobs_list.size();
+  cout << "smash: sending SIGKILL signal to " + size + " jobs:" << endl;
+  for(JobEntry* job_entry : jobs_list)
+  {
+    cout << job_entry->pid + ": " + job_entry->command << endl;
+  }
   for(JobEntry* job_entry : jobs_list)
   {
     send_signal(job_entry->pid, SIGKILL)
   }
+  cout << "Linux-shell:";
 }
 
 bool process_status_is_done(pid_t pid)
@@ -728,3 +737,16 @@ void BgCommand::execute()
    }
   }
 }
+
+void TimeoutCommand::execute()
+{
+    //TODO: timeout command should only make one fork, for its inner command
+    //TODO: add to joblist, while command is the entire line, piazza q175
+    //TODO: smash error: timout: invalid arguments
+    alarm(duration) //arranges for a SIGALRM signal to be delivered to the calling process in duration seconds
+
+    //TODO: run the given ‘command’ as though it was given to the smash directly
+    //TOOD: save all timed commands in a list<timestamp, duration, pid>
+}
+
+//TODO: check out q152 cerr

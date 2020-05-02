@@ -217,8 +217,14 @@ class CdCommand : public BuiltInCommand {
   void execute() override;
 };
 
-// TODO: add more classes if needed 
-// maybe timeout ?
+class TimeoutCommand : //TODO: complete
+{
+  public:
+    unsigned int duration; //in seconds
+    TimeoutCommand(const char* cmd_line);
+    virtual ~TimeoutCommand() {}
+    void execute() override;
+};
 
 class SmallShell {
  private:

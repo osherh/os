@@ -34,5 +34,7 @@ void ctrlCHandler(int sig_num)
 
 void alarmHandler(int sig_num) 
 {
-  // TODO: Add your implementation
+	//TODO: send a SIGKILL to the command's process(unless it's the smash)
+
+	cout << "smash: [" + cmd_line + "] timed out!"; // cmd_line is in format: timeout <duration> <command>
 }
