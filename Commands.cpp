@@ -6,12 +6,16 @@
 #include <sstream>
 #include <sys/wait.h>
 #include <iomanip>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include "Commands.h"
 
 using namespace std;
 
 jobs = new JobsList(); 
 
+const int stdoutfd(dup(fileno(stdout)));
 const std::string WHITESPACE = " \n\r\t\f\v";
 
 #if 0
@@ -165,8 +169,25 @@ void BuiltInCommand::execute()
 void SmallShell::executeCommand(const char *cmd_line)
 {
   Command* cmd = CreateCommand(cmd_line);
-
+  cmd->check_special_command();
+  if(cmd.special_command_num == 0)
+  { 
+   redirection_command();
+  }
+  else if(cmd.special_command_num == 1)
+  {
+   redirection_command_append();
+  }
+  else if(cmd.special_command_num == 2)
+  {
+   pipe_command_stdout();
+  }
+  else if(cmd.special_command_num == 3)
+  {
+   pipe_command_stderr();
+  }
   cmd->execute();
+  cmd->restore_stdout();
   //TODO: Please note that you must fork smash process for some commands (e.g., external commands....)
 }
 
@@ -750,3 +771,66 @@ void TimeoutCommand::execute()
 }
 
 //TODO: check out q152 cerr
+
+int Command::check_special_command()
+{
+ bool found_sign= false;
+ int length_cmd = strlen(cmd_line);
+  char copy_cmd[length_cmd+1];
+  strcpy(copy_cmd , cmd_line);
+  token = strtok(copy_cmd," ");
+  while(token!=NULL)
+  { 
+   if(found_sign==true)
+   {
+    strcpy(fname,token); 
+   }
+   if(token[0] == '>')
+   { 
+    if(token[1] == '>')
+    {
+     this.special_command_num = 1;
+     found_sign = true;
+    }
+    else
+    {
+     this.special_command_num = 0;
+     found_sign = true;
+	}
+   }
+   else if(token[0] == '|')
+   {
+    if(token[1] == '&')
+    {
+     this.special_command_num = 3;
+     found_sign = true;
+	}
+    else
+    {
+     this.special_command_num = 2;
+     found_sign = true;
+	}
+   }
+   token=strtok(NULL," ");
+  }
+}
+
+void Command::redirection_command()
+{ 
+ int newstdout = open(this->fname, O_WRONLY | O_CREAT);
+  dup2(newstdout, fileno(stdout));
+  close(newstdout);
+}
+
+void Commad::redirection_command_append()
+{
+ int newstdout = open(this->fname, O_WRONLY | O_CREAT | O_APPEND);
+ dup2(newstdout, fileno(stdout));
+ close(newstdout);
+}
+
+void Command::restore_stdout()
+{
+  fflush(stdout);
+  dup2(stdoutfd, fileno(stdout));
+  }

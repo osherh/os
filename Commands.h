@@ -18,9 +18,17 @@ class Command {
   const char* cmd_line;
   char* oldpath = "0";
   char* token;
+  int special_command_num=-1;
+  char* fname;
   Command(const char* cmd_line);
   virtual ~Command();
   virtual void execute() = 0;
+  virtual void check_special_command()= 0;
+  virtual void redirection_command();
+  virtual void redirection_command_append();
+  virtual void pipe_command_stdout();
+  virtual void pipe_command_stderr();
+  virtual void restore_stdout();
   static
   //virtual void prepare();
   //virtual void cleanup();
