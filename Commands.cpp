@@ -94,15 +94,18 @@ SmallShell::SmallShell()
   fg_command = "";
   fg_pid = -1;
 	jobs = new JobsList();
+  timeouts = new list<TimeoutEntry*>();
 }
 
 SmallShell::~SmallShell() 
 {
-	for(JobEntry* job_entry : jobs_list)
-	{
-		delete job_entry;
-	}
 	delete jobs;
+  
+  for(TimeoutEntry* timeout_entry : timeouts)
+  {
+    delete timeout_entry;
+  }
+  delete timeouts;
 }
 
 /**
@@ -157,7 +160,12 @@ Command * SmallShell::CreateCommand(const char* cmd_line)
     return new QuitCommand(cmd_line);    
   }
 
-  else 
+ else if(cmd_s.find("timeout") == 0)
+ {
+    return new TimeoutCommand(cmd_line);
+ }
+ 
+ else 
   {
     return new ExternalCommand(cmd_line);
   }
@@ -285,6 +293,20 @@ void CdCommand::execute()
   } 
 }
 
+JobsList::JobsList()
+{
+  jobs_list = new list<JobEntry*>();
+}
+
+JobsList::~JobsList()
+{
+  for(JobEntry* job_entry : jobs_list)
+  {
+    delete job_entry;
+  }
+  delete jobs_list;
+}
+
 JobEntry* JobsList::getLastJob(int* lastJobId)
 {
   list<JobEntry*>::reverse_iterator last_it = jobs_list.rbegin();
@@ -353,12 +375,11 @@ bool process_status_is_done(pid_t pid)
   return waitpid(pid, &status, WNOHANG) > 0;
 }
 
-void JobEntry::JobEntry(pid_t pid, int job_id, bool is_stopped, bool is_done, char* command, time_t inserted_time)
+void JobEntry::JobEntry(pid_t pid, int job_id, bool is_stopped, char* command, time_t inserted_time)
 {
   this->pid = pid;
   this->job_id = job_id;
   this->is_stopped = is_stopped;
-  this->is_done = is_done;
   this->command = command;
   this->inserted_time = inserted_time;
 }
@@ -373,8 +394,7 @@ void JobsList::addJob(Command* cmd, bool isStopped = false)
         job_id = max_job_id + 1;
       }
       pid_t pid = getpid();
-      bool is_done = process_status_is_done(pid);
-      JobEntry* job_entry = new JobEntry(pid, job_id, iStopped, is_done, cmd->cmd_line, time(NULL))
+      JobEntry* job_entry = new JobEntry(pid, job_id, iStopped, cmd->cmd_line, time(NULL))
       jobs_list.push_back(job_entry);
 }
 
@@ -387,7 +407,7 @@ void JobsList::addStoppedJob(pid_t pid, char* cmd)
         int job_id = smash.jobs->getLastJob()->job_id + 1;
         job_id = max_job_id + 1;
       }
-      JobEntry* job_entry = new JobEntry(pid, job_id, true, false, cmd, time(NULL))
+      JobEntry* job_entry = new JobEntry(pid, job_id, true, cmd, time(NULL))
       jobs_list.push_back(job_entry);        
 }
 
@@ -401,7 +421,7 @@ void JobsList::removeFinishedJobs()
 {
 	for(JobEntry* job_entry : jobs_list)
 	{
-		if(job_entry->is_done)
+		if(process_status_is_done(job_entry->pid))
 		{
 			smash.jobs->removeJobById(job_entry->job_id);
 		}
@@ -725,7 +745,7 @@ void BgCommand::execute()
     if (job_num == 0 )
     {
      perror("smash error: bg: invalid arguments")
-	}
+	  }
     else
     {
      stopped_job = smash.jobs->getJobById(job_num);
@@ -748,17 +768,39 @@ void BgCommand::execute()
   }
 }
 
+TimeoutCommand::TimeoutCommand(const char* cmd_line);
+{
+  this->cmd_line = cmd_line;
+}
+
 void TimeoutCommand::execute()
 {
-	//if command is external call external::execute(), no other fork is needed
-    //TODO: timeout command should only make one fork, for its inner command(only if the inner command is not built in). 
-    //timeout with fg wont be tested.
-    //TODO: add to joblist, while command is the entire line, piazza q175
-    //TODO: smash error: timout: invalid arguments
-    alarm(duration) //arranges for a SIGALRM signal to be delivered to the calling process in duration seconds
-    //TODO: run the given ‘command’ as though it was given to the smash directly
-    //TOOD: save all timed commands in a list<timestamp, duration, pid>
-    //TODO: if the inner command was a built in one, dont send the SIGKILL to it
+    strtok(cmd_line, " ");  //read the timeout command, and inc the pointer to point at duration
+    char* duration = strtok(NULL, " ");
+    char* number_check;
+    if(token != NULL)
+    {
+        strcpy(number_check);
+        duration_num = atoi(check_num);
+        if (duration_num <= 0)
+        {
+          perror("smash error: timeout: invalid arguments");
+        }
+    }
+    char* command = strtok(NULL, "\0");
+    if (command == NULL)
+    {
+        perror("smash error: timeout: invalid arguments");
+    }
+    smash.jobs->addJob(this);
+    alarm(duration)   //arranges for a SIGALRM signal to be delivered to the calling process in duration seconds
+    TimeoutEntry* timeout_entry = new TimeoutEntry();
+    timeout_entry->timestamp = time(NULL);
+    timeout_entry->duration = duration_num;
+    //TODO: add smash_pid if it is BuiltIn cmd else add the external pid from fork on father
+    smash.timeouts->push_back(timeout_entry);
+    smash.executeCommand(cmd);
+    //TODO: when to remove an entry from the timeouts list
 }
 
 //TODO: check out q152 cerr

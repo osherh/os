@@ -35,9 +35,20 @@ void ctrlCHandler(int sig_num)
 void alarmHandler(int sig_num) 
 {
 	cout << "smash: got an alarm" << endl;
-	//TODO: send a SIGKILL to the command's process(unless it's the smash)
-	//TODO: check what happens if i send SIGKILL to a process that is finished(zombie)
-	
-	//TODO: print only if process isnt done before timeout:
-	cout << "smash: [" + cmd_line + "] timed out!" << endl; // cmd_line is in format: timeout <duration> <command>
+	pid_t curr_cmd_pid = getLastTimeoutCommandPid(); //TODO: rename and impl
+	bool process_is_done = process_status_is_done(curr_cmd_pid);
+	if(curr_cmd_pid != smash.smash_pid) 		//not a BuiltIn cmd
+	{
+		if(!process_is_done)
+		{
+			if(kill(curr_cmd_pid, SIGKILL) != 0)
+    		{
+     			syscall_failed_msg("kill");
+    		}
+		}
+	}
+	if(!process_is_done)
+	{
+		cout << "smash: [" + cmd_line + "] timed out!" << endl; // cmd_line is in format: timeout <duration> <command>
+	}
 }
