@@ -210,7 +210,7 @@ void ChpromptCommand::execute()
 
 void ShowPidCommand::execute()
 {
-   std::cout <<"smash pid is "<< ::getpid() << std::endl;
+   std::cout <<"smash pid is "<< smash.smash_pid << std::endl;
 }
 
 void GetCurrDirCommand::execute()
