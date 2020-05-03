@@ -7,11 +7,6 @@
 #define COMMAND_MAX_ARGS (20)
 #define HISTORY_MAX_RECORDS (50)
 
-char *smash = "smash> ";
-pid_t fg_pid;
-char* fg_command;
-JobsList* jobs;
-
 class Command {
 // TODO: Add your data members
  public:
@@ -128,7 +123,7 @@ class HistoryCommand : public BuiltInCommand {
 
 class JobsList 
 {
- list<JobEntry> jobs_list;
+ list<JobEntry*> jobs_list;
  public:
   class JobEntry 
   {
@@ -226,11 +221,20 @@ class TimeoutCommand : //TODO: complete
     void execute() override;
 };
 
-class SmallShell {
+class SmallShell 
+{
+ 
  private:
-  // TODO: Add your data members
   SmallShell();
+ 
  public:
+  
+  pid_t smash_pid;
+  char *smash_msg;
+  pid_t fg_pid;
+  char* fg_command;
+  JobsList* jobs;
+
   Command *CreateCommand(const char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor
   void operator=(SmallShell const&)  = delete; // disable = operator
