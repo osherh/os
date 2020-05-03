@@ -13,7 +13,7 @@
 
 using namespace std;
 
-SmallShell& smash = SmallShell::getInstance();
+jobs = new JobsList(); 
 
 const int stdoutfd(dup(fileno(stdout)));
 const std::string WHITESPACE = " \n\r\t\f\v";
@@ -91,25 +91,12 @@ void _removeBackgroundSign(char* cmd_line) {
 
 // TODO: Add your implementation for classes in Commands.h 
 
-SmallShell::SmallShell() 
-{
-  smash_pid = getpid();
-	char *smash_msg = "smash> ";
-  fg_command = "";
-  fg_pid = -1;
-	jobs = new JobsList();
-  timeouts = new list<TimeoutEntry*>();
+SmallShell::SmallShell() {
+// TODO: add your implementation
 }
 
-SmallShell::~SmallShell() 
-{
-	delete jobs;
-  
-  for(TimeoutEntry* timeout_entry : timeouts)
-  {
-    delete timeout_entry;
-  }
-  delete timeouts;
+SmallShell::~SmallShell() {
+// TODO: add your implementation
 }
 
 /**
@@ -164,12 +151,7 @@ Command * SmallShell::CreateCommand(const char* cmd_line)
     return new QuitCommand(cmd_line);    
   }
 
- else if(cmd_s.find("timeout") == 0)
- {
-    return new TimeoutCommand(cmd_line);
- }
- 
- else 
+  else 
   {
     return new ExternalCommand(cmd_line);
   }
@@ -212,7 +194,7 @@ void SmallShell::executeCommand(const char *cmd_line)
 void ChpromptCommand::execute()
 {
   base.execute(); //calls BuiltInCommand::execute
-  char new_smash_msg = smash.smash_msg;
+  char new_smash= smash;
   char* end_of_prompt ="> ";
   int count=0;
   while (token != NULL)
@@ -225,21 +207,21 @@ void ChpromptCommand::execute()
    }
    else if (count == 1) //the next prompt we need to print
    {
-   strcpy(new_smash_msg , token);
+   strcpy(new_smash , token);
    count++;
    break;
    }
    if (count == 1)
   {
-    new_smash_msg = "smash";
+    new_smash = "smash";
   }
-  strncat(new_smash_msg, end_of_prompt, 2);
+  strncat(new_smash, end_of_prompt, 2);
  }
 }
 
 void ShowPidCommand::execute()
 {
-   std::cout <<"smash pid is "<< smash.smash_pid << std::endl;
+   std::cout <<"smash pid is "<< ::getpid() << std::endl;
 }
 
 void GetCurrDirCommand::execute()
@@ -314,20 +296,6 @@ void CdCommand::execute()
   } 
 }
 
-JobsList::JobsList()
-{
-  jobs_list = new list<JobEntry*>();
-}
-
-JobsList::~JobsList()
-{
-  for(JobEntry* job_entry : jobs_list)
-  {
-    delete job_entry;
-  }
-  delete jobs_list;
-}
-
 JobEntry* JobsList::getLastJob(int* lastJobId)
 {
   list<JobEntry*>::reverse_iterator last_it = jobs_list.rbegin();
@@ -396,39 +364,41 @@ bool process_status_is_done(pid_t pid)
   return waitpid(pid, &status, WNOHANG) > 0;
 }
 
-void JobEntry::JobEntry(pid_t pid, int job_id, bool is_stopped, char* command, time_t inserted_time)
+void JobEntry::JobEntry(pid_t pid, int job_id, bool is_stopped, bool is_done, char* command, time_t inserted_time)
 {
   this->pid = pid;
   this->job_id = job_id;
   this->is_stopped = is_stopped;
+  this->is_done = is_done;
   this->command = command;
   this->inserted_time = inserted_time;
 }
 
 void JobsList::addJob(Command* cmd, bool isStopped = false)
 {
-      smash.jobs->removeFinishedJobs();
+      jobs->removeFinishedJobs();
       int job_id = 1;
       if(!jobs_list.empty()) 
       {
-        int job_id = smash.jobs->getLastJob()->job_id + 1;
+        int job_id = jobs->getLastJob()->job_id + 1;
         job_id = max_job_id + 1;
       }
       pid_t pid = getpid();
-      JobEntry* job_entry = new JobEntry(pid, job_id, iStopped, cmd->cmd_line, time(NULL))
+      bool is_done = process_status_is_done(pid);
+      JobEntry* job_entry = new JobEntry(pid, job_id, iStopped, is_done, cmd->cmd_line, time(NULL))
       jobs_list.push_back(job_entry);
 }
 
 void JobsList::addStoppedJob(pid_t pid, char* cmd)
 {
-      smash.jobs->removeFinishedJobs();
+      jobs->removeFinishedJobs();
       int job_id = 1;
       if(!jobs_list.empty())
       {
-        int job_id = smash.jobs->getLastJob()->job_id + 1;
+        int job_id = jobs->getLastJob()->job_id + 1;
         job_id = max_job_id + 1;
       }
-      JobEntry* job_entry = new JobEntry(pid, job_id, true, cmd, time(NULL))
+      JobEntry* job_entry = new JobEntry(pid, job_id, true, false, cmd, time(NULL))
       jobs_list.push_back(job_entry);        
 }
 
@@ -442,16 +412,16 @@ void JobsList::removeFinishedJobs()
 {
 	for(JobEntry* job_entry : jobs_list)
 	{
-		if(process_status_is_done(job_entry->pid))
+		if(job_entry->is_done)
 		{
-			smash.jobs->removeJobById(job_entry->job_id);
+			jobs->removeJobById(job_entry->job_id);
 		}
 	}
 }
 
 void JobsList::printJobsList()
 {
-	smash.jobs->removeFinishedJobs();
+	jobs->removeFinishedJobs();
 	for(JobEntry* job_entry : jobs_list)
 	{
 		time_t curr_time = time(NULL);
@@ -485,7 +455,7 @@ bool JobsList::stopped_joblist_is_empty()
 
 void JobsCommand::execute()
 {
-  smash.jobs->printJobsList();
+  jobs->printJobsList();
 }
 
 void KillCommand::execute()
@@ -553,7 +523,7 @@ void KillCommand::execute()
       else if(count == 2) // we have both signal and job_id
       {
         int job_id = atoi(token);
-        JobEntry* job_found = smash.jobs->getJobById(job_id);
+        JobEntry* job_found = jobs->getJobById(job_id);
         if(job_found == NULL)
         {
           perror("smash error: kill: job-id " + job_id + " does not exist");
@@ -569,9 +539,10 @@ void KillCommand::execute()
 
 void ExternalCommand::execute()
 {
-    //TODO: add strtok call
-    base.execute();
-    
+    int length_line = strlen(cmd_line);
+    char copy_cmd_line[length_line+1];
+    strcpy(copy_cmd_line , cmd_line);
+    token = strtok(copy_cmd_line," ");
     char* bg_sign;
     int index = 0;
     bool need_to_wait = true;
@@ -600,15 +571,15 @@ void ExternalCommand::execute()
 	   {
         if(need_to_wait == false)
         {
-          smash.jobs->addJob(this);
+         jobs->addJob(this);
 		    }
 		    else //foreground
         {
-          smash.fg_pid = pid;
-          smash.fg_command = cmd_line;
+          fg_pid = pid;
+          fg_command = cmd_line;
           waitpid(pid, NULL, 0); //pid is the son pid
-          smash.fg_pid = -1;
-          smash.fg_command = "";
+          fg_pid = -1;
+          fg_command = "";
         }
 	   }
 	   else if (pid == 0) //son
@@ -636,7 +607,7 @@ void QuitCommand::execute()
   {
     if(strcmp(token, "kill") == 0)
     {
-      smash.jobs->killAllJobs();
+      jobs->killAllJobs();
       exit(1)
     }
   }
@@ -660,7 +631,7 @@ void FgCommand::execute()
  }
  else if (count == 1) //no args given
  {
-   bool is_empty = smash.jobs->isEmpty();
+   bool is_empty = jobs->isEmpty();
    if (is_empty == true)
    {
     perror("smash error: fg: jobs list is empty");
@@ -668,15 +639,15 @@ void FgCommand::execute()
    else
    {
     int last_job_id;
-    wanted_job = smash.jobs->getLastJob(&last_job_id); //TODO - make sure this is the job with the highest job id
-    smash.fg_pid = wanted_job->pid;
-    smash.fg_command = cmd_line;
+    wanted_job = jobs->getLastJob(&last_job_id); //TODO - make sure this is the job with the highest job id
+    fg_pid = wanted_job->pid;
+    fg_command = cmd_line;
     send_signal(wanted_job->pid, SIGCONT);
     stringstream job_stream << wanted_job->command << " : " << wanted_job->pid << " " << endl;
     waitpid(wanted_job->pid, NULL, 0);
-    smash.fg_pid = -1;
-    smash.fg_command = "";
-    smash.jobs->removeJobById(wanted_job->job_id);
+    fg_pid = -1;
+    fg_command = "";
+    jobs->removeJobById(wanted_job->job_id);
     return;
    }
  }
@@ -700,21 +671,21 @@ void FgCommand::execute()
 	  }
     else
     {
-      wanted_job = smash.jobs->getJobById(job_number);
+      wanted_job = jobs->getJobById(job_number);
       if (wanted_job == NULL)
       {
         perror("smash error: fg: job-id"+ job_number +"does not exist");
 	    }
       else
       {
-       smash.fg_pid = wanted_job->pid;
-       smash.fg_command = cmd_line;
+       fg_pid = wanted_job->pid;
+       fg_command = cmd_line;
        send_signal(wanted_job->pid, SIGCONT);
        stringstream job_stream << wanted_job->command << " : " << wanted_job->pid << " " << endl;
        waitpid(wanted_job->pid, NULL, 0);
-       smash.fg_pid = -1;
-       smash.fg_command = "";
-       smash.jobs->removeJobById(wanted_job->job_id);
+       fg_pid = -1;
+       fg_command = "";
+       jobs->removeJobById(wanted_job->job_id);
 	    }
     }
   }
@@ -738,7 +709,7 @@ void BgCommand::execute()
   }
   else if(count==1)
   {
-   bool is_empty = smash.jobs->stopped_joblist_is_empty();
+   bool is_empty = jobs->stopped_joblist_is_empty();
    if (is_empty == true)
    {
     perror("smash error: bg: there is no stopped jobs to resume");
@@ -746,7 +717,7 @@ void BgCommand::execute()
    else
    {
     int last_stopped_job_id;
-    stopped_job = smash.jobs->getLastStoppedJob(&last_stopped_job_id);
+    stopped_job = jobs->getLastStoppedJob(&last_stopped_job_id);
     send_signal(stopped_job->pid, SIGCONT);
     stringstream job_stream << stopped_job->command << " : " << stopped_job->pid << " " << endl;
     stopped_job->is_stopped = false;
@@ -766,10 +737,10 @@ void BgCommand::execute()
     if (job_num == 0 )
     {
      perror("smash error: bg: invalid arguments")
-	  }
+	}
     else
     {
-     stopped_job = smash.jobs->getJobById(job_num);
+     stopped_job = jobs->getJobById(job_num);
      if (stopped_job == NULL)
      {
       perror("smash error: bg: job-id " + job_num + " does not exist");
@@ -789,39 +760,15 @@ void BgCommand::execute()
   }
 }
 
-TimeoutCommand::TimeoutCommand(const char* cmd_line);
-{
-  this->cmd_line = cmd_line;
-}
-
 void TimeoutCommand::execute()
 {
-    strtok(cmd_line, " ");  //read the timeout command, and inc the pointer to point at duration
-    char* duration = strtok(NULL, " ");
-    char* number_check;
-    if(token != NULL)
-    {
-        strcpy(number_check);
-        duration_num = atoi(check_num);
-        if (duration_num <= 0)
-        {
-          perror("smash error: timeout: invalid arguments");
-        }
-    }
-    char* command = strtok(NULL, "\0");
-    if (command == NULL)
-    {
-        perror("smash error: timeout: invalid arguments");
-    }
-    smash.jobs->addJob(this);
-    alarm(duration)   //arranges for a SIGALRM signal to be delivered to the calling process in duration seconds
-    TimeoutEntry* timeout_entry = new TimeoutEntry();
-    timeout_entry->timestamp = time(NULL);
-    timeout_entry->duration = duration_num;
-    //TODO: add smash_pid if it is BuiltIn cmd else add the external pid from fork on father
-    smash.timeouts->push_back(timeout_entry);
-    smash.executeCommand(cmd);
-    //TODO: when to remove an entry from the timeouts list
+    //TODO: timeout command should only make one fork, for its inner command
+    //TODO: add to joblist, while command is the entire line, piazza q175
+    //TODO: smash error: timout: invalid arguments
+    alarm(duration) //arranges for a SIGALRM signal to be delivered to the calling process in duration seconds
+
+    //TODO: run the given ‘command’ as though it was given to the smash directly
+    //TOOD: save all timed commands in a list<timestamp, duration, pid>
 }
 
 //TODO: check out q152 cerr
