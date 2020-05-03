@@ -7,13 +7,8 @@
 #define COMMAND_MAX_ARGS (20)
 #define HISTORY_MAX_RECORDS (50)
 
-char *smash = "smash> ";
-pid_t fg_pid;
-char* fg_command;
-JobsList* jobs;
-
-class Command {
-// TODO: Add your data members
+class Command 
+{
  public:
   const char* cmd_line;
   char* oldpath = "0";
@@ -32,7 +27,6 @@ class Command {
   static
   //virtual void prepare();
   //virtual void cleanup();
-  // TODO: Add your extra methods if needed
 };
 
 class BuiltInCommand : public Command {
@@ -49,16 +43,16 @@ class ExternalCommand : public Command {
   void execute() override;
 };
 
-class PipeCommand : public Command {
-  // TODO: Add your data members
+class PipeCommand : public Command 
+{
  public:
   PipeCommand(const char* cmd_line);
   virtual ~PipeCommand() {}
   void execute() override;
 };
 
-class RedirectionCommand : public Command {
- // TODO: Add your data members
+class RedirectionCommand : public Command 
+{
  public:
   explicit RedirectionCommand(const char* cmd_line);
   virtual ~RedirectionCommand() {}
@@ -116,9 +110,7 @@ class QuitCommand : public BuiltInCommand
 class CommandsHistory {
  protected:
   class CommandHistoryEntry {
-	  // TODO: Add your data members
   };
- // TODO: Add your data members
  public:
   CommandsHistory();
   ~CommandsHistory() {}
@@ -127,7 +119,6 @@ class CommandsHistory {
 };
 
 class HistoryCommand : public BuiltInCommand {
- // TODO: Add your data members
  public:
   HistoryCommand(const char* cmd_line, CommandsHistory* history);
   virtual ~HistoryCommand() {}
@@ -136,7 +127,7 @@ class HistoryCommand : public BuiltInCommand {
 
 class JobsList 
 {
- list<JobEntry> jobs_list;
+ list<JobEntry*> jobs_list;
  public:
   class JobEntry 
   {
@@ -144,11 +135,9 @@ class JobsList
       pid_t pid;
       int job_id;
       bool is_stopped;
-      bool is_done;
       char* command;
       time_t inserted_time;
   };
- // TODO: Add your data members
  public:
   JobsList();
   ~JobsList();
@@ -163,11 +152,9 @@ class JobsList
   JobEntry *getLastStoppedJob(int *jobId);
   bool isEmpty();
   bool stopped_joblist_is_empty();
-  // TODO: Add extra methods or modify exisitng ones as needed
 };
 
 class JobsCommand : public BuiltInCommand {
- // TODO: Add your data members
  public:
   //JobsCommand(const char* cmd_line, JobsList* jobs);
   JobsCommand(const char* cmd_line);
@@ -176,7 +163,6 @@ class JobsCommand : public BuiltInCommand {
 };
 
 class KillCommand : public BuiltInCommand {
- // TODO: Add your data members
  public:
   //KillCommand(const char* cmd_line, JobsList* jobs);
   KillCommand(const char* cmd_line);
@@ -185,7 +171,6 @@ class KillCommand : public BuiltInCommand {
 };
 
 class ForegroundCommand : public BuiltInCommand {
- // TODO: Add your data members
  public:
   ForegroundCommand(const char* cmd_line);
   //ForegroundCommand(const char* cmd_line, JobsList* jobs);
@@ -194,7 +179,6 @@ class ForegroundCommand : public BuiltInCommand {
 };
 
 class BackgroundCommand : public BuiltInCommand {
- // TODO: Add your data members
  public:
   BackgroundCommand(const char* cmd_line);
   //BackgroundCommand(const char* cmd_line, JobsList* jobs);
@@ -225,20 +209,39 @@ class CdCommand : public BuiltInCommand {
   void execute() override;
 };
 
-class TimeoutCommand : //TODO: complete
+class TimeoutEntry
 {
   public:
-    unsigned int duration; //in seconds
+    pid_t pid;
+    time_t timestamp;
+    int duration; //in seconds
+    ~TimeoutEntry();
+    void TimeoutEntry(pid_t pid, time_t timestamp, int duration);
+};
+
+class TimeoutCommand : public Command //TODO: check it
+{
+  public:
     TimeoutCommand(const char* cmd_line);
     virtual ~TimeoutCommand() {}
     void execute() override;
 };
 
-class SmallShell {
+class SmallShell 
+{
+ 
  private:
-  // TODO: Add your data members
   SmallShell();
+ 
  public:
+  
+  pid_t smash_pid;
+  char *smash_msg;
+  pid_t fg_pid;
+  char* fg_command;
+  JobsList* jobs;
+  list<TimeoutEntry*> timeouts;
+
   Command *CreateCommand(const char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor
   void operator=(SmallShell const&)  = delete; // disable = operator
