@@ -89,8 +89,6 @@ void _removeBackgroundSign(char* cmd_line) {
   cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
-// TODO: Add your implementation for classes in Commands.h 
-
 SmallShell::SmallShell() 
 {
   smash_pid = getpid();
@@ -378,8 +376,6 @@ void send_signal(pid_t pid, int signal)
     }
 }
 
-//TODO: add endl where needed
-
 void JobsList::killAllJobs()
 {
   size_t size = jobs_list.size();
@@ -437,7 +433,6 @@ void JobsList::addStoppedJob(pid_t pid, char* cmd)
       jobs_list.push_back(job_entry);        
 }
 
-//TODO: check if calls delete or dtor
 void JobsList::removeJobById(int job_id)
 {
 	jobs_list.remove_if(entry => entry.job_id);
@@ -466,7 +461,7 @@ void JobsList::printJobsList()
     {
       job_stream << " (stopped)";
     }
-    cout << job_stream.c_str(); //TODO - fix 
+    cout << job_stream.str() << endl; 
   }
 }
 bool JobsList::isEmpty()
@@ -565,7 +560,7 @@ void KillCommand::execute()
         }
         send_signal(job_found->pid, sig_num);
         stringstream kill_stream << "signal " << sig_num << " was sent to pid " << job_found->pid;
-        cout << job_kill.c_str(); //TODO - fix 
+        cout << job_kill.str() << endl; 
         token = NULL;
       }
     } //end while
@@ -643,13 +638,14 @@ void QuitCommand::execute()
   {
     exit(1);
   }
-  else
+  while(token != NULL)
   {
     if(strcmp(token, "kill") == 0)
     {
       smash.jobs->killAllJobs();
       exit(1)
     }
+    token = strtok(NULL, " ");  
   }
 }
 
@@ -679,7 +675,7 @@ void FgCommand::execute()
    else
    {
     int last_job_id;
-    wanted_job = smash.jobs->getLastJob(&last_job_id); //TODO - make sure this is the job with the highest job id
+    wanted_job = smash.jobs->getLastJob(&last_job_id);
     smash.fg_pid = wanted_job->pid;
     smash.fg_command = cmd_line;
     send_signal(wanted_job->pid, SIGCONT);
@@ -915,16 +911,16 @@ void Command::check_special_command()
 
 void Command::redirection_command()
 { 
- int newstdout = open(this->fname, O_WRONLY | O_CREAT | O_TRUNC);
+  int newstdout = open(this->fname, O_WRONLY | O_CREAT | O_TRUNC);
   dup2(newstdout, fileno(stdout));
   close(newstdout);
 }
 
 void Commad::redirection_command_append()
 {
- int newstdout = open(this->fname, O_WRONLY | O_CREAT | O_APPEND);
- dup2(newstdout, fileno(stdout));
- close(newstdout);
+  int newstdout = open(this->fname, O_WRONLY | O_CREAT | O_APPEND);
+  dup2(newstdout, fileno(stdout));
+  close(newstdout);
 }
 
 void Command::restore_stdout()
@@ -935,78 +931,79 @@ void Command::restore_stdout()
 
 void BuiltInCommand::CopyCommand()
 {
- base.execute();
- char* bg_sign;
- int index = 0;
- bool need_to_wait = true;
- while(token != NULL)
- {
-  strcpy(bg_sign, token);
-  token = strtok(NULL, " ");
-  if(token == NULL)
-  {
-   while(bg_sign[index] != NULL)
-   {
-    char sig_bg = bg_sign[index];
-    index++; 
-    if(bg_sign[index] == NULL)
+    base.execute();
+    char* bg_sign;
+    int index = 0;
+    bool need_to_wait = true;
+    while(token != NULL)
     {
-     if(sig_bg == '&')
-     {
-      need_to_wait = false;
-     }
-	} 
-   }
-  }
- }
- token = strtok(copy_cmd_line," ");
- token = strtok(NULL," ");
- char* file1;
- char* file2;
- strcpy(file1,token);
- token = strtok(NULL," ");
- strcpy(file2,token);
- int pid = fork();
- if(pid > 0) //father
- {
-  if(need_to_wait == false)
-  {
-   smash.jobs->addJob(this);
-  }
-   else //foreground
-  {
-   smash.fg_pid = pid;
-   smash.fg_command = cmd_line;
-   waitpid(pid, NULL, 0); //pid is the son pid
-   smash.fg_pid = -1;
-   smash.fg_command = "";
-  }
- }
- else if (pid == 0) //son
- {
-  setpgrp();
-  int check_file1 = open(file1, O_RDONLY | O_CREAT);
-  if(check_file1==-1)
-  perror("the file cant be opened");
-  int check_file2 = open(file2, O_WRONLY | O_CREAT | O_TRUNC);
-  if(check_file2==-1)
-  perror("the file cant be opened");
-  char* content;
-
-  rewind(file1);
-  rewind(file2);
-    
-    while(feof(file1) == 0)
-    {
-        fgets(content,100,file1);
-        fputs(content,file2);
+      strcpy(bg_sign, token);
+      token = strtok(NULL, " ");
+      if(token == NULL)
+      {
+        while(bg_sign[index] != NULL)
+        {
+          char sig_bg = bg_sign[index];
+          index++; 
+          if(bg_sign[index] == NULL)
+          {
+            if(sig_bg == '&')
+            {
+              need_to_wait = false;
+            }
+	        } 
+        }
+      }
     }
-    close(file1);
-    close(file2);  
- }
- else
- { 
- perror("can't execute the command");
- }  
-}
+    token = strtok(copy_cmd_line," ");
+    token = strtok(NULL," ");
+    char* file1;
+    char* file2;
+    strcpy(file1,token);
+    token = strtok(NULL," ");
+    strcpy(file2,token);
+    int pid = fork();
+    if(pid > 0) //father
+    {
+      if(need_to_wait == false)
+      {
+          smash.jobs->addJob(this);
+      }
+      else //foreground
+      {
+          smash.fg_pid = pid;
+          smash.fg_command = cmd_line;
+          waitpid(pid, NULL, 0); //pid is the son pid
+          smash.fg_pid = -1;
+          smash.fg_command = "";
+      }
+    }
+    else if (pid == 0) //son
+    {
+        setpgrp();
+        int check_file1 = open(file1, O_RDONLY | O_CREAT);
+        if(check_file1 == -1)
+        {
+            perror("the file cant be opened");
+        }
+        int check_file2 = open(file2, O_WRONLY | O_CREAT | O_TRUNC);
+        if(check_file2 == -1)
+        {
+            perror("the file cant be opened");
+        }
+        char* content;
+        rewind(file1);
+        rewind(file2); 
+        while(feof(file1) == 0)
+        {
+            fgets(content,100,file1);
+            fputs(content,file2);
+        }
+        close(file1);
+        close(file2);  
+    }
+    else
+    { 
+        perror("can't execute the command");
+    }  
 }

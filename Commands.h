@@ -137,6 +137,10 @@ class JobsList
       bool is_stopped;
       char* command;
       time_t inserted_time;
+      
+      JobEntry();
+      JobEntry(pid_t pid, int job_id, bool is_stopped, char* command, time_t inserted_time);
+      ~JobEntry();
   };
  public:
   JobsList();
