@@ -241,6 +241,7 @@ class SmallShell
   char* fg_command;
   JobsList* jobs;
   list<TimeoutEntry*> timeouts;
+  bool alarm_is_set;
 
   Command *CreateCommand(const char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor
@@ -253,7 +254,10 @@ class SmallShell
   }
   ~SmallShell();
   void executeCommand(const char* cmd_line);
-  // TODO: add extra methods as needed
+  
+  void AddPidToLastTimeoutEntry(pid_t pid);
+  pid_t getLastTimeoutInnerCommandPid();
+  void removeTimeoutByPid(pid_t pid);
 };
 
 #endif //SMASH_COMMAND_H_
