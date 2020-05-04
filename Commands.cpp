@@ -168,6 +168,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line)
  {
     return new TimeoutCommand(cmd_line);
  }
+ else if(cmd_s.find("cp")==0)
+ {
+    return new CopyCommand(cmd_line);
+ }
  
  else 
   {
@@ -887,4 +891,81 @@ void Command::restore_stdout()
 {
   fflush(stdout);
   dup2(stdoutfd, fileno(stdout));
+}
+
+void BuiltInCommand::CopyCommand()
+{
+ base.execute();
+ char* bg_sign;
+ int index = 0;
+ bool need_to_wait = true;
+ while(token != NULL)
+ {
+  strcpy(bg_sign, token);
+  token = strtok(NULL, " ");
+  if(token == NULL)
+  {
+   while(bg_sign[index] != NULL)
+   {
+    char sig_bg = bg_sign[index];
+    index++; 
+    if(bg_sign[index] == NULL)
+    {
+     if(sig_bg == '&')
+     {
+      need_to_wait = false;
+     }
+	} 
+   }
   }
+ }
+ token = strtok(copy_cmd_line," ");
+ token = strtok(NULL," ");
+ char* file1;
+ char* file2;
+ strcpy(file1,token);
+ token = strtok(NULL," ");
+ strcpy(file2,token);
+ int pid = fork();
+ if(pid > 0) //father
+ {
+  if(need_to_wait == false)
+  {
+   smash.jobs->addJob(this);
+  }
+   else //foreground
+  {
+   smash.fg_pid = pid;
+   smash.fg_command = cmd_line;
+   waitpid(pid, NULL, 0); //pid is the son pid
+   smash.fg_pid = -1;
+   smash.fg_command = "";
+  }
+ }
+ else if (pid == 0) //son
+ {
+  setpgrp();
+  int check_file1 = open(file1, O_RDONLY | O_CREAT);
+  if(check_file1==-1)
+  perror("the file cant be opened");
+  int check_file2 = open(file2, O_WRONLY | O_CREAT | O_TRUNC);
+  if(check_file2==-1)
+  perror("the file cant be opened");
+  char* content;
+
+  rewind(file1);
+  rewind(file2);
+    
+    while(feof(file1) == 0)
+    {
+        fgets(content,100,file1);
+        fputs(content,file2);
+    }
+    close(file1);
+    close(file2);  
+ }
+ else
+ { 
+ perror("can't execute the command");
+ }  
+}
