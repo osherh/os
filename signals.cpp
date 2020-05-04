@@ -35,13 +35,13 @@ void ctrlCHandler(int sig_num)
 void alarmHandler(int sig_num) 
 {
 	cout << "smash: got an alarm" << endl;
-	pid_t curr_cmd_pid = getLastTimeoutCommandPid(); //TODO: rename and impl
+	pid_t inner_cmd_pid = smash.getLastTimeoutInnerCommandPid();
 	bool process_is_done = process_status_is_done(curr_cmd_pid);
-	if(curr_cmd_pid != smash.smash_pid) 		//not a BuiltIn cmd
+	if(inner_cmd_pid != smash.smash_pid) //not a BuiltIn cmd
 	{
 		if(!process_is_done)
 		{
-			if(kill(curr_cmd_pid, SIGKILL) != 0)
+			if(kill(inner_cmd_pid, SIGKILL) != 0)
     		{
      			syscall_failed_msg("kill");
     		}
@@ -49,6 +49,8 @@ void alarmHandler(int sig_num)
 	}
 	if(!process_is_done)
 	{
-		cout << "smash: [" + cmd_line + "] timed out!" << endl; // cmd_line is in format: timeout <duration> <command>
+		cout << "smash: [" + cmd_line + "] timed out!" << endl; //cmd_line is in format: timeout <duration> <command>
 	}
+	//TODO: check if removal by additional params is needed
+	smash.removeTimeoutByPid(inner_cmd_pid);
 }

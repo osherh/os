@@ -190,6 +190,7 @@ void BuiltInCommand::execute()
 
 void SmallShell::executeCommand(const char *cmd_line)
 {
+  //TODO: else if -> if clauses or add else
   Command* cmd = CreateCommand(cmd_line);
   cmd->check_special_command();
   if(cmd.special_command_num == 0)
@@ -602,6 +603,12 @@ void ExternalCommand::execute()
 	   int pid = fork();
 	   if(pid > 0) //father
 	   {
+        if(smash.alarm_is_set)
+        {
+          smash.AddPidToLastTimeoutEntry(pid);
+          smash.alarm_is_set = false;
+        }
+
         if(need_to_wait == false)
         {
           smash.jobs->addJob(this);
@@ -819,57 +826,90 @@ void TimeoutCommand::execute()
     }
     smash.jobs->addJob(this);
     alarm(duration)   //arranges for a SIGALRM signal to be delivered to the calling process in duration seconds
+    smash.alarm_is_set = true;
     TimeoutEntry* timeout_entry = new TimeoutEntry();
     timeout_entry->timestamp = time(NULL);
     timeout_entry->duration = duration_num;
-    //TODO: add smash_pid if it is BuiltIn cmd else add the external pid from fork on father
     smash.timeouts->push_back(timeout_entry);
     smash.executeCommand(cmd);
-    //TODO: when to remove an entry from the timeouts list
+}
+
+pid_t SmallShell::getLastTimeoutInnerCommandPid()
+{
+    for (list<TimeoutEntry*>::reverse_iterator rit = timeouts.rbegin(); rit != timeouts.rend(); ++rit)
+    {
+        time_t curr_time = time(NULL);
+        TimeoutEntry* timeout_entry = *rit;
+        if(difftime(curr_time, timeout_entry->timestamp) == duration)
+        {
+          return timeout_entry->pid;
+        }
+    }   
+    return -1;
+}
+
+void SmallShell::removeTimeoutByPid(pid_t pid)
+{
+    //cant just remove by remove_if() since there can be multiple entries with this pid
+    for (list<TimeoutEntry*>::reverse_iterator rit = timeouts.rbegin(); rit != timeouts.rend(); ++rit)
+    {
+      if(timeout_entry->pid == pid)
+      {
+        timeouts.remove(timeout_entry);
+        break;
+      }
+    }
+}
+
+void SmallShell::AddPidToLastTimeoutEntry(pid_t pid)
+{
+    TimeoutEntry* timeout_entry= timeouts.back();
+    timeout_entry->pid = pid;
+    timeouts.push_back(timeout_entry); 
 }
 
 //TODO: check out q152 cerr
 
-int Command::check_special_command()
+void Command::check_special_command()
 {
- bool found_sign= false;
- int length_cmd = strlen(cmd_line);
+  bool found_sign= false;
+  int length_cmd = strlen(cmd_line);
   char copy_cmd[length_cmd+1];
   strcpy(copy_cmd , cmd_line);
   token = strtok(copy_cmd," ");
   while(token!=NULL)
   { 
-   if(found_sign==true)
-   {
-    strcpy(fname,token); 
-   }
-   if(token[0] == '>')
-   { 
-    if(token[1] == '>')
+    if(found_sign==true)
     {
-     this.special_command_num = 1;
-     found_sign = true;
+      strcpy(fname,token); 
     }
-    else
+    if(token[0] == '>')
+    { 
+      if(token[1] == '>')
+      {
+        this->special_command_num = 1;
+        found_sign = true;
+      }
+      else
+      {
+        this->special_command_num = 0;
+        found_sign = true;
+      }
+    }
+    else if(token[0] == '|')
     {
-     this.special_command_num = 0;
-     found_sign = true;
-	}
-   }
-   else if(token[0] == '|')
-   {
-    if(token[1] == '&')
-    {
-     this.special_command_num = 3;
-     found_sign = true;
-	}
-    else
-    {
-     this.special_command_num = 2;
-     found_sign = true;
-	}
-   }
-   token=strtok(NULL," ");
+      if(token[1] == '&')
+      {
+        this->special_command_num = 3;
+        found_sign = true;
+	    }
+      else
+      {
+        this->special_command_num = 2;
+        found_sign = true;
+	    }
+    }
+    token=strtok(NULL," ");
   }
 }
 
@@ -968,4 +1008,5 @@ void BuiltInCommand::CopyCommand()
  { 
  perror("can't execute the command");
  }  
+}
 }
