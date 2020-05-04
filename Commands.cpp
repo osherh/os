@@ -871,7 +871,7 @@ int Command::check_special_command()
 
 void Command::redirection_command()
 { 
- int newstdout = open(this->fname, O_WRONLY | O_CREAT);
+ int newstdout = open(this->fname, O_WRONLY | O_CREAT | O_TRUNC);
   dup2(newstdout, fileno(stdout));
   close(newstdout);
 }
