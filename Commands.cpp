@@ -216,28 +216,28 @@ void ChpromptCommand::execute()
 {
   base.execute(); //calls BuiltInCommand::execute
   char new_smash_msg = smash.smash_msg;
-  char* end_of_prompt ="> ";
-  int count=0;
+  char* end_of_prompt = "> ";
+  int count = 0;
   while (token != NULL)
   {
-   if (count == 0) //pass the first word(because its chprompt)
-   { 
-       token = strtok(NULL, " ");
-       count++;
-       continue;
-   }
-   else if (count == 1) //the next prompt we need to print
-   {
-   strcpy(new_smash_msg , token);
-   count++;
-   break;
-   }
-   if (count == 1)
-  {
-    new_smash_msg = "smash";
+      if (count == 0) //pass the first word(because its chprompt)
+      { 
+          token = strtok(NULL, " ");
+          count++;
+          continue;
+      }
+      else if (count == 1) //the next prompt we need to print
+      {
+          strcpy(new_smash_msg , token);
+          count++;
+          break;
+      }
+      if (count == 1)
+      {
+          new_smash_msg = "smash";
+      }
+      strncat(new_smash_msg, end_of_prompt, 2);
   }
-  strncat(new_smash_msg, end_of_prompt, 2);
- }
 }
 
 void ShowPidCommand::execute()
@@ -999,8 +999,8 @@ void BuiltInCommand::CopyCommand()
             fgets(content,100,file1);
             fputs(content,file2);
         }
-        close(file1);
-        close(file2);  
+        close(check_file1);
+        close(check_file2);  
     }
     else
     { 
