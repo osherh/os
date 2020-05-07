@@ -1,7 +1,8 @@
 #ifndef SMASH_COMMAND_H_
 #define SMASH_COMMAND_H_
 
-#include <vector>
+#include <list>
+#include <string>
 
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
@@ -10,35 +11,33 @@
 class Command 
 {
  public:
-  const char* cmd_line;
-  char* oldpath = "0";
+  char* cmd_line;
+  std::string oldpath = "0";
   char* token;
   int special_command_num=-1;
   char* fname;
-  Command(const char* cmd_line);
+  Command(char* cmd_line);
   virtual ~Command();
   virtual void execute() = 0;
-  virtual void check_special_command()= 0;
-  virtual void redirection_command();
-  virtual void redirection_command_append();
-  virtual void pipe_command_stdout();
-  virtual void pipe_command_stderr();
-  virtual void restore_stdout();
-  static
-  //virtual void prepare();
-  //virtual void cleanup();
+  //special commands
+  void check_special_command();
+  void redirection_command();
+  void redirection_command_append();
+  void pipe_command_stdout();
+  void pipe_command_stderr();
+  void restore_stdout();
 };
 
 class BuiltInCommand : public Command {
  public:
-  BuiltInCommand(const char* cmd_line);
+  BuiltInCommand(char* cmd_line);
   virtual ~BuiltInCommand() {}
   void execute() override;
 };
 
 class ExternalCommand : public Command {
  public:
-  ExternalCommand(const char* cmd_line);
+  ExternalCommand(char* cmd_line);
   virtual ~ExternalCommand() {}
   void execute() override;
 };
@@ -46,7 +45,7 @@ class ExternalCommand : public Command {
 class PipeCommand : public Command 
 {
  public:
-  PipeCommand(const char* cmd_line);
+  PipeCommand(char* cmd_line);
   virtual ~PipeCommand() {}
   void execute() override;
 };
@@ -54,44 +53,35 @@ class PipeCommand : public Command
 class RedirectionCommand : public Command 
 {
  public:
-  explicit RedirectionCommand(const char* cmd_line);
+  explicit RedirectionCommand(char* cmd_line);
   virtual ~RedirectionCommand() {}
-  void execute() override;
-  //void prepare() override;
-  //void cleanup() override;
-};
-
-class ChangeDirCommand : public BuiltInCommand {
-// TODO: Add your data members public:
-  ChangeDirCommand(const char* cmd_line, char** plastPwd);
-  virtual ~ChangeDirCommand() {}
   void execute() override;
 };
 
 class GetCurrDirCommand : public BuiltInCommand {
  public:
-  GetCurrDirCommand(const char* cmd_line);
+  GetCurrDirCommand(char* cmd_line);
   virtual ~GetCurrDirCommand() {}
   void execute() override;
 };
 
 class ShowPidCommand : public BuiltInCommand {
  public:
-  ShowPidCommand(const char* cmd_line);
+  ShowPidCommand(char* cmd_line);
   virtual ~ShowPidCommand() {}
   void execute() override;
 };
 
 class BgCommand : public BuiltInCommand {
  public:
-  BgCommand(const char* cmd_line);
+  BgCommand(char* cmd_line);
   virtual ~BgCommand() {}
   void execute() override;
 };
 
 class FgCommand : public BuiltInCommand {
  public:
-  FgCommand(const char* cmd_line);
+  FgCommand(char* cmd_line);
   virtual ~FgCommand() {}
   void execute() override;
 };
@@ -101,35 +91,14 @@ class JobsList;
 class QuitCommand : public BuiltInCommand 
 {
   public:
-    //QuitCommand(const char* cmd_line, JobsList* jobs);
-    QuitCommand(const char* cmd_line);
+    QuitCommand(char* cmd_line);
     virtual ~QuitCommand() {}
     void execute() override;
 };
 
-class CommandsHistory {
- protected:
-  class CommandHistoryEntry {
-  };
- public:
-  CommandsHistory();
-  ~CommandsHistory() {}
-  void addRecord(const char* cmd_line);
-  void printHistory();
-};
-
-class HistoryCommand : public BuiltInCommand {
- public:
-  HistoryCommand(const char* cmd_line, CommandsHistory* history);
-  virtual ~HistoryCommand() {}
-  void execute() override;
-};
-
 class JobsList 
 {
- list<JobEntry*> jobs_list;
- public:
-  class JobEntry 
+  class JobEntry
   {
     public:
       pid_t pid;
@@ -142,7 +111,14 @@ class JobsList
       JobEntry(pid_t pid, int job_id, bool is_stopped, char* command, time_t inserted_time);
       ~JobEntry();
   };
- public:
+  std::list<JobEntry*>* jobs_list;  
+
+  friend class KillCommand;
+  friend class FgCommand;
+  friend class BgCommand;
+  friend class TimeoutCommand;
+
+  public:
   JobsList();
   ~JobsList();
   void addJob(Command* cmd, bool isStopped = false);
@@ -160,32 +136,28 @@ class JobsList
 
 class JobsCommand : public BuiltInCommand {
  public:
-  //JobsCommand(const char* cmd_line, JobsList* jobs);
-  JobsCommand(const char* cmd_line);
+  JobsCommand(char* cmd_line);
   virtual ~JobsCommand() {}
   void execute() override;
 };
 
 class KillCommand : public BuiltInCommand {
  public:
-  //KillCommand(const char* cmd_line, JobsList* jobs);
-  KillCommand(const char* cmd_line);
+  KillCommand(char* cmd_line);
   virtual ~KillCommand() {}
   void execute() override;
 };
 
 class ForegroundCommand : public BuiltInCommand {
  public:
-  ForegroundCommand(const char* cmd_line);
-  //ForegroundCommand(const char* cmd_line, JobsList* jobs);
+  ForegroundCommand(char* cmd_line);
   virtual ~ForegroundCommand() {}
   void execute() override;
 };
 
 class BackgroundCommand : public BuiltInCommand {
  public:
-  BackgroundCommand(const char* cmd_line);
-  //BackgroundCommand(const char* cmd_line, JobsList* jobs);
+  BackgroundCommand(char* cmd_line);
   virtual ~BackgroundCommand() {}
   void execute() override;
 };
@@ -194,21 +166,21 @@ class BackgroundCommand : public BuiltInCommand {
 // TODO: should it really inhirit from BuiltInCommand ?
 class CopyCommand : public BuiltInCommand {
  public:
-  CopyCommand(const char* cmd_line);
+  CopyCommand(char* cmd_line);
   virtual ~CopyCommand() {}
   void execute() override;
 };
 
 class ChpromptCommand : public BuiltInCommand {
  public:
-  ChpromptCommand(const char* cmd_line);
+  ChpromptCommand(char* cmd_line);
   virtual ~ChpromptCommand() {}
   void execute() override;
 };
 
 class CdCommand : public BuiltInCommand {
  public:
-  CdCommand(const char* cmd_line);
+  CdCommand(char* cmd_line);
   virtual ~CdCommand() {}
   void execute() override;
 };
@@ -219,14 +191,14 @@ class TimeoutEntry
     pid_t pid;
     time_t timestamp;
     int duration; //in seconds
+    TimeoutEntry();
     ~TimeoutEntry();
-    void TimeoutEntry(pid_t pid, time_t timestamp, int duration);
 };
 
 class TimeoutCommand : public Command //TODO: check it
 {
   public:
-    TimeoutCommand(const char* cmd_line);
+    TimeoutCommand(char* cmd_line);
     virtual ~TimeoutCommand() {}
     void execute() override;
 };
@@ -240,14 +212,14 @@ class SmallShell
  public:
   
   pid_t smash_pid;
-  char *smash_msg;
+  std::string smash_msg;
   pid_t fg_pid;
-  char* fg_command;
+  std::string fg_command;
   JobsList* jobs;
-  list<TimeoutEntry*> timeouts;
+  std::list<TimeoutEntry*>* timeouts;
   bool alarm_is_set;
 
-  Command *CreateCommand(const char* cmd_line);
+  Command *CreateCommand(char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor
   void operator=(SmallShell const&)  = delete; // disable = operator
   static SmallShell& getInstance() // make SmallShell singleton
@@ -257,8 +229,12 @@ class SmallShell
     return instance;
   }
   ~SmallShell();
-  void executeCommand(const char* cmd_line);
+  void executeCommand(char* cmd_line);
   
+  void syscallFailedMsg(char* syscall_name);
+  void sendSignal(pid_t pid, int signal);
+
+  //timeout:
   void AddPidToLastTimeoutEntry(pid_t pid);
   pid_t getLastTimeoutInnerCommandPid();
   void removeTimeoutByPid(pid_t pid);
