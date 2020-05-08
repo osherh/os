@@ -16,16 +16,11 @@ class Command
   char* token;
   int special_command_num=-1;
   char* fname;
+  bool redirection_flag = false;
+  bool Pipe_flag= false;
   Command(char* cmd_line);
   virtual ~Command();
   virtual void execute() = 0;
-  //special commands
-  void check_special_command();
-  void redirection_command();
-  void redirection_command_append();
-  void pipe_command_stdout();
-  void pipe_command_stderr();
-  void restore_stdout();
 };
 
 class BuiltInCommand : public Command {

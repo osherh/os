@@ -15,7 +15,6 @@ using namespace std;
 
 SmallShell& smash = SmallShell::getInstance();
 
-const int stdoutfd(dup(fileno(stdout)));
 const std::string WHITESPACE = " \n\r\t\f\v";
 
 #if 0
@@ -118,8 +117,20 @@ SmallShell::~SmallShell()
 Command * SmallShell::CreateCommand(char* cmd_line)
 {
   string cmd_s = string(cmd_line);
-
-  if(cmd_s.find("chprompt") == 0) //1
+  if(cmd_s.find(">") > 0)
+  {
+    
+   Command* redirection_cmd = new RedirectionCommand(cmd_line);
+   redirection_cmd->redirection_flag = true;
+   return redirection_cmd;
+  }
+  else if(cmd_s.find("|") > 0)
+  {
+    Command* Pipe_cmd = new PipeCommand(cmd_line);
+    Pipe_cmd->Pipe_flag = true;
+    return Pipe_cmd;
+  }
+  else if(cmd_s.find("chprompt") == 0) //1
   {
     return new ChpromptCommand(cmd_line);
   }
@@ -238,33 +249,78 @@ void SmallShell::executeCommand(char *cmd_line)
 {
   //TODO: else if -> if clauses or add else
   Command* cmd = CreateCommand(cmd_line);
-  cmd->check_special_command();
-  if(cmd->special_command_num == 0)
+  bool need_to_wait = _isBackgroundComamnd(cmd_line) == false;
+  int pid_special;
+  if(cmd->redirection_flag == true)
   { 
-      cmd->redirection_command();
-  }
-  else if(cmd->special_command_num == 1)
-  {
-      cmd->redirection_command_append();
-  }
-  else if(cmd->special_command_num == 2)
-  {
-      cmd->pipe_command_stdout();
-  }
-  else if(cmd->special_command_num == 3)
-  {
-      cmd->pipe_command_stderr();
-  }
+    pid_special = fork();
+    if(pid_special > 0) //father
+   {
+    if(smash.alarm_is_set)
+    {
+      smash.AddPidToLastTimeoutEntry(pid);
+      smash.alarm_is_set = false;
+    }
 
-  //TODO: move if necessary
-  cmd->restore_stdout();
-
-  //TODO: add flag if on pipe state
-
-  if(smash.cmdIsExternal(cmd_line))
+    if(need_to_wait == false)
+    {
+      smash.jobs->addJob(this);
+    }
+    else //foreground
+    {
+      smash.fg_pid = pid_special;
+      smash.fg_command = cmd_line;
+      waitpid(pid_special, NULL, 0); //pid is the son pid
+      smash.fg_pid = -1;
+      smash.fg_command = "";
+    }
+   }
+   else if (pid_special == 0) //son
+   {
+      setpgrp();
+      cmd->execute();
+   }
+   else
+   { 
+      perror(syscallFailedMsg("fork"));
+   }
+  }
+  else if(cmd->Pipe_flag == true)
   {
-    bool need_to_wait = _isBackgroundComamnd(cmd_line) == false;
+    pid_special = fork();
+   if(pid_special > 0) //father
+   {
+    if(smash.alarm_is_set)
+    {
+      smash.AddPidToLastTimeoutEntry(pid);
+      smash.alarm_is_set = false;
+    }
 
+    if(need_to_wait == false)
+    {
+      smash.jobs->addJob(this);
+    }
+    else //foreground
+    {
+      smash.fg_pid = pid_special;
+      smash.fg_command = cmd_line;
+      waitpid(pid_special, NULL, 0); //pid is the son pid
+      smash.fg_pid = -1;
+      smash.fg_command = "";
+    }
+   }
+   else if (pid_special == 0) //son
+   {
+      setpgrp();
+      cmd->execute();
+   }
+   else
+   { 
+      perror(syscallFailedMsg("fork"));
+   }
+  }
+  else if(smash.cmdIsExternal(cmd_line))
+  {
   int pid = fork();
   if(pid > 0) //father
   {
@@ -952,12 +1008,13 @@ void SmallShell::AddPidToLastTimeoutEntry(pid_t pid)
 
 //TODO: check out q152 cerr
 
-void Command::check_special_command()
+void RedirectionCommand::execute()
 {
   bool found_sign= false;
   int length_cmd = strlen(cmd_line);
   char copy_cmd[length_cmd+1];
   strcpy(copy_cmd , cmd_line);
+  char* cmd_section;
   token = strtok(copy_cmd," ");
   while(token!=NULL)
   { 
@@ -978,7 +1035,42 @@ void Command::check_special_command()
         found_sign = true;
       }
     }
-    else if(token[0] == '|')
+    else if(token[0] != '>' & found_sign==false)
+    {
+    strcat(cmd_section,token);
+    strcat(cmd_section," ");
+	}
+  token=strtok(NULL," ");
+  }
+ if(this->special_command_num == 0)
+ {
+  int newstdout = open(this->fname, O_WRONLY | O_CREAT | O_TRUNC);
+  dup2(newstdout, 1);
+  close(newstdout);
+ }
+ else if(this->special_command_num == 1)
+ {
+  int newstdout = open(this->fname, O_WRONLY | O_CREAT | O_APPEND);
+  dup2(newstdout, 1);
+  close(newstdout);
+ }
+ Command* cmd_action = SmallShell::CreateCommand(cmd_section);
+ cmd_action->execute();
+}
+
+void PipeCommand::execute()
+{
+ int new_fd;
+ bool found_sign= false;
+ int length_cmd = strlen(cmd_line);
+  char copy_cmd[length_cmd+1];
+  char* cmd_section1;
+  char* cmd_section2;
+  strcpy(copy_cmd , cmd_line);
+  token = strtok(copy_cmd," ");
+  while(token!=NULL)
+  { 
+    if(token[0] == '|')
     {
       if(token[1] == '&')
       {
@@ -989,30 +1081,55 @@ void Command::check_special_command()
       {
         this->special_command_num = 2;
         found_sign = true;
-	    }
+	   }
     }
+     else if(token[0] != '|' & found_sign==false)
+    {
+    strcat(cmd_section1,token);
+    strcat(cmd_section1," ");
+	}
+    else if(token[0] != '|' & found_sign==true & token[0] != '&')
+    {
+    strcat(cmd_section2,token);
+    strcat(cmd_section2," ");
+	}
     token=strtok(NULL," ");
   }
-}
+  if(this->special_command_num == 2)
+  new_fd =1;
 
-void Command::redirection_command()
-{ 
-  int newstdout = open(this->fname, O_WRONLY | O_CREAT | O_TRUNC);
-  dup2(newstdout, fileno(stdout));
-  close(newstdout);
-}
+  if(this->special_command_num == 3)
+  new_fd =2;
 
-void Command::redirection_command_append()
-{
-  int newstdout = open(this->fname, O_WRONLY | O_CREAT | O_APPEND);
-  dup2(newstdout, fileno(stdout));
-  close(newstdout);
-}
-
-void Command::restore_stdout()
-{
-  fflush(stdout);
-  dup2(stdoutfd, fileno(stdout));
+  
+  int fd[2];
+  pipe(fd);
+  int pid1=fork();
+  if (pid1 == 0)
+  {
+   dup2(fd[1],new_fd);
+   close(fd[0]);
+   close(fd[1]);
+   Command* cmd_action1 = SmallShell::CreateCommand(cmd_section1);
+   cmd_action1->execute();
+  }
+ else
+ {
+  int pid2=fork();
+  if (pid2 == 0)
+  {
+   dup2(fd[0],0);
+   close(fd[0]);
+   close(fd[1]);  
+   Command* cmd_action2 = SmallShell::CreateCommand(cmd_section2);
+   cmd_action2->execute();
+  }
+  else
+  {
+   waitpid(pid1,NULL,0);
+   waitpid(pid2,NULL,0);
+  }
+ }
 }
 
 void CopyCommand::execute()
@@ -1077,14 +1194,12 @@ void CopyCommand::execute()
         {
             perror("the file cant be opened");
         }
-        char* content;
-        rewind(file1);
-        rewind(file2); 
-        while(feof(file1) == 0)
+        char* content[100];
+        size_t size;
+ 
+        while ((size = read(file1, content, 100)) > 0) 
         {
-            //TODO: replace with read() and write()
-            fgets(content,100,file1);
-            fputs(content,file2);
+        write(file2, content, size);
         }
         close(check_file1);
         close(check_file2);  
