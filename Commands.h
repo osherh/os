@@ -102,7 +102,6 @@ class JobsList
       char* command;
       time_t inserted_time;
       
-      JobEntry();
       JobEntry(pid_t pid, int job_id, bool is_stopped, char* command, time_t inserted_time);
       ~JobEntry();
   };
@@ -183,11 +182,10 @@ class CdCommand : public BuiltInCommand {
 class TimeoutEntry
 {
   public:
+    const char* full_command;
     pid_t pid;
     time_t timestamp;
     int duration; //in seconds
-    TimeoutEntry();
-    ~TimeoutEntry();
 };
 
 class TimeoutCommand : public Command //TODO: check it
@@ -224,15 +222,20 @@ class SmallShell
     return instance;
   }
   ~SmallShell();
-  void executeCommand(char* cmd_line);
-  
-  void syscallFailedMsg(char* syscall_name);
+  void executeCommand(char* cmd_line);  
   void sendSignal(pid_t pid, int signal);
 
-  //timeout:
-  void AddPidToLastTimeoutEntry(pid_t pid);
-  pid_t getLastTimeoutInnerCommandPid();
-  void removeTimeoutByPid(pid_t pid);
+  //timeout
+  void SetPidToTimeoutEntry(pid_t pid);
+  TimeoutEntry* getTimeoutEntry();
+  void removeTimeoutEntryByPid(pid_t pid);
+
+  //process
+  bool process_status_is_done(pid_t pid);
+  bool cmdIsExternal(const char* command);
+  void syscallFailedMsg(std::string syscall_name);
 };
+
+extern SmallShell& smash;
 
 #endif //SMASH_COMMAND_H_

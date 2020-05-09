@@ -1,56 +1,62 @@
 #include <iostream>
+#include <sstream>
+#include <string.h>
 #include <signal.h>
 #include "signals.h"
 #include "Commands.h"
 
 using namespace std;
 
+//SmallShell& smash = SmallShell::getInstance();
+
 void ctrlZHandler(int sig_num) 
 {
 	cout << "smash: got ctrl-Z" << endl;
-	smash.jobs->addStoppedJob(fg_pid, fg_command);
-	if(fg_pid! = -1)
+	//TODO: chek unfreed memory issues
+	smash.jobs->addStoppedJob(smash.fg_pid, strdup(smash.fg_command.c_str()));
+	if(smash.fg_pid != -1)
 	{
-		if(kill(fg_pid, SIGSTOP) != 0)
-    	{
-     		syscall_failed_msg("kill");
-    	}
+		smash.sendSignal(smash.fg_pid, SIGSTOP);
 	}
-	cout << "smash: process " + fg_pid + " was stopped" << endl;
+	stringstream msg;
+	msg << "smash: process " << smash.fg_pid << " was stopped";
+	cout << msg.str() << endl;
 }
 
 void ctrlCHandler(int sig_num)
 {
 	cout << "smash: got ctrl-C" << endl;
-	if(fg_pid! = -1)
+	if(smash.fg_pid != -1)
 	{
-		if(kill(fg_pid, SIGKILL) != 0)
-    	{
-     		syscall_failed_msg("kill");
-    	}
+		smash.sendSignal(smash.fg_pid, SIGKILL);
 	}
-	cout << "smash: process " + fg_pid + " was killed" << endl;
+	stringstream msg;
+	msg << "smash: process " << smash.fg_pid << " was killed"; 
+	cout << msg.str() << endl;
 }
 
 void alarmHandler(int sig_num) 
 {
 	cout << "smash: got an alarm" << endl;
-	pid_t inner_cmd_pid = smash.getLastTimeoutInnerCommandPid();
-	bool process_is_done = process_status_is_done(curr_cmd_pid);
+	TimeoutEntry* timeout_entry = smash.getTimeoutEntry();
+	pid_t inner_cmd_pid = timeout_entry->pid;
+	bool process_is_done = smash.process_status_is_done(inner_cmd_pid);
 	if(inner_cmd_pid != smash.smash_pid) //not a BuiltIn cmd
 	{
 		if(!process_is_done)
 		{
 			if(kill(inner_cmd_pid, SIGKILL) != 0)
     		{
-     			syscall_failed_msg("kill");
+     			smash.syscallFailedMsg("kill");
     		}
 		}
 	}
 	if(!process_is_done)
 	{
-		cout << "smash: [" + cmd_line + "] timed out!" << endl; //cmd_line is in format: timeout <duration> <command>
+		stringstream msg;
+		msg << "smash: [" << timeout_entry->full_command << "] timed out!"; //cmd_line is in format: timeout <duration> <command>
+		cout << msg.str() << endl;
 	}
 	//TODO: check if removal by additional params is needed
-	smash.removeTimeoutByPid(inner_cmd_pid);
+	smash.removeTimeoutEntryByPid(inner_cmd_pid);
 }
