@@ -8,6 +8,8 @@
 #define COMMAND_MAX_ARGS (20)
 #define HISTORY_MAX_RECORDS (50)
 
+class SmallShell;
+
 class Command 
 {
  public:
@@ -17,24 +19,24 @@ class Command
   int special_command_num=-1;
   char* fname;
   bool redirection_flag = false;
-  bool Pipe_flag= false;
+  bool pipe_flag= false;
   Command(char* cmd_line);
   virtual ~Command();
-  virtual void execute() = 0;
+  virtual void execute(SmallShell* smash) = 0;
 };
 
 class BuiltInCommand : public Command {
  public:
   BuiltInCommand(char* cmd_line);
   virtual ~BuiltInCommand() {}
-  void execute() override;
+  void execute(SmallShell* smash) override;
 };
 
 class ExternalCommand : public Command {
  public:
   ExternalCommand(char* cmd_line);
   virtual ~ExternalCommand() {}
-  void execute() override;
+  void execute(SmallShell* smash) override;
 };
 
 class PipeCommand : public Command 
@@ -42,7 +44,7 @@ class PipeCommand : public Command
  public:
   PipeCommand(char* cmd_line);
   virtual ~PipeCommand() {}
-  void execute() override;
+  void execute(SmallShell* smash) override;
 };
 
 class RedirectionCommand : public Command 
@@ -50,35 +52,35 @@ class RedirectionCommand : public Command
  public:
   explicit RedirectionCommand(char* cmd_line);
   virtual ~RedirectionCommand() {}
-  void execute() override;
+  void execute(SmallShell* smash) override;
 };
 
 class GetCurrDirCommand : public BuiltInCommand {
  public:
   GetCurrDirCommand(char* cmd_line);
   virtual ~GetCurrDirCommand() {}
-  void execute() override;
+  void execute(SmallShell* smash) override;
 };
 
 class ShowPidCommand : public BuiltInCommand {
  public:
   ShowPidCommand(char* cmd_line);
   virtual ~ShowPidCommand() {}
-  void execute() override;
+  void execute(SmallShell* smash) override;
 };
 
 class BgCommand : public BuiltInCommand {
  public:
   BgCommand(char* cmd_line);
   virtual ~BgCommand() {}
-  void execute() override;
+  void execute(SmallShell* smash) override;
 };
 
 class FgCommand : public BuiltInCommand {
  public:
   FgCommand(char* cmd_line);
   virtual ~FgCommand() {}
-  void execute() override;
+  void execute(SmallShell* smash) override;
 };
 
 class JobsList;
@@ -88,7 +90,7 @@ class QuitCommand : public BuiltInCommand
   public:
     QuitCommand(char* cmd_line);
     virtual ~QuitCommand() {}
-    void execute() override;
+    void execute(SmallShell* smash) override;
 };
 
 class JobsList 
@@ -115,11 +117,11 @@ class JobsList
   public:
   JobsList();
   ~JobsList();
-  void addJob(Command* cmd, bool isStopped = false);
-  void addStoppedJob(pid_t pid, char* cmd);
-  void printJobsList();
-  void killAllJobs();
-  void removeFinishedJobs();
+  void addJob(SmallShell* smash, Command* cmd, bool isStopped = false);
+  void addStoppedJob(SmallShell* smash, pid_t pid, char* cmd);
+  void printJobsList(SmallShell* smash);
+  void killAllJobs(SmallShell* smash);
+  void removeFinishedJobs(SmallShell* smash);
   JobEntry * getJobById(int jobId);
   void removeJobById(int jobId);
   JobEntry * getLastJob(int* lastJobId);
@@ -132,51 +134,36 @@ class JobsCommand : public BuiltInCommand {
  public:
   JobsCommand(char* cmd_line);
   virtual ~JobsCommand() {}
-  void execute() override;
+  void execute(SmallShell* smash) override;
 };
 
 class KillCommand : public BuiltInCommand {
  public:
   KillCommand(char* cmd_line);
   virtual ~KillCommand() {}
-  void execute() override;
+  void execute(SmallShell* smash) override;
 };
-
-class ForegroundCommand : public BuiltInCommand {
- public:
-  ForegroundCommand(char* cmd_line);
-  virtual ~ForegroundCommand() {}
-  void execute() override;
-};
-
-class BackgroundCommand : public BuiltInCommand {
- public:
-  BackgroundCommand(char* cmd_line);
-  virtual ~BackgroundCommand() {}
-  void execute() override;
-};
-
 
 // TODO: should it really inhirit from BuiltInCommand ?
 class CopyCommand : public BuiltInCommand {
  public:
   CopyCommand(char* cmd_line);
   virtual ~CopyCommand() {}
-  void execute() override;
+  void execute(SmallShell* smash) override;
 };
 
 class ChpromptCommand : public BuiltInCommand {
  public:
   ChpromptCommand(char* cmd_line);
   virtual ~ChpromptCommand() {}
-  void execute() override;
+  void execute(SmallShell* smash) override;
 };
 
 class CdCommand : public BuiltInCommand {
  public:
   CdCommand(char* cmd_line);
   virtual ~CdCommand() {}
-  void execute() override;
+  void execute(SmallShell* smash) override;
 };
 
 class TimeoutEntry
@@ -193,12 +180,11 @@ class TimeoutCommand : public Command //TODO: check it
   public:
     TimeoutCommand(char* cmd_line);
     virtual ~TimeoutCommand() {}
-    void execute() override;
+    void execute(SmallShell* smash) override;
 };
 
 class SmallShell 
-{
- 
+{ 
  private:
   SmallShell();
  
@@ -233,9 +219,8 @@ class SmallShell
   //process
   bool process_status_is_done(pid_t pid);
   bool cmdIsExternal(const char* command);
+
   void syscallFailedMsg(std::string syscall_name);
 };
-
-extern SmallShell& smash;
 
 #endif //SMASH_COMMAND_H_
