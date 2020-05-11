@@ -14,12 +14,11 @@ class Command
 {
  public:
   char* cmd_line;
-  std::string oldpath = "0";
   char* token;
-  int special_command_num=-1;
+  int special_command_num;
   char* fname;
-  bool redirection_flag = false;
-  bool pipe_flag= false;
+  bool redirection_flag;
+  bool pipe_flag;
   Command(char* cmd_line);
   virtual ~Command();
   virtual void execute(SmallShell* smash) = 0;
@@ -189,7 +188,9 @@ class SmallShell
   SmallShell();
  
  public:
+  std::string smash_msg;
   bool alarm_is_set;
+  std::string oldpath;
 
   Command *CreateCommand(char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor
@@ -214,7 +215,6 @@ class SmallShell
   void syscallFailedMsg(std::string syscall_name);
 };
 
-extern std::string smash_msg;
 extern pid_t smash_pid;
 extern pid_t fg_pid;
 extern std::string fg_command;

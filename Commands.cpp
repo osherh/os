@@ -20,7 +20,6 @@ std::list<TimeoutEntry*>* timeouts = new std::list<TimeoutEntry*>();
 pid_t smash_pid;
 pid_t fg_pid = -1;
 std::string fg_command = "";
-std::string smash_msg = "smash> ";
 
 #if 0
 #define FUNC_ENTRY()  \
@@ -95,8 +94,11 @@ void _removeBackgroundSign(char* cmd_line) {
 
 SmallShell::SmallShell() 
 {
-    smash_pid = getpid();
-    alarm_is_set = false;
+  this->alarm_is_set = false;
+  this->oldpath = "0";
+  this->smash_msg = "smash> ";
+
+  smash_pid = getpid();
 }
 
 SmallShell::~SmallShell() 
@@ -117,13 +119,13 @@ SmallShell::~SmallShell()
 Command * SmallShell::CreateCommand(char* cmd_line)
 {
   string cmd_s = string(cmd_line);
-  if(cmd_s.find(">") > 0)
+  if(cmd_s.find(">") != std::string::npos)
   {
    Command* redirection_cmd = new RedirectionCommand(cmd_line);
    redirection_cmd->redirection_flag = true;
    return redirection_cmd;
   }
-  else if(cmd_s.find("|") > 0)
+  else if(cmd_s.find("|") != std::string::npos)
   {
     Command* pipe_cmd = new PipeCommand(cmd_line);
     pipe_cmd->pipe_flag = true;
@@ -193,6 +195,10 @@ Command * SmallShell::CreateCommand(char* cmd_line)
 Command::Command(char* cmd_line)
 {
   this->cmd_line = cmd_line;
+  this->redirection_flag = false;
+  this->pipe_flag = false;
+  this->special_command_num = -1;
+
 }
 
 
@@ -236,15 +242,15 @@ void BuiltInCommand::execute(SmallShell* smash)
   int length_line = strlen(cmd_line);
   char copy_cmd_line[length_line+1];
   strcpy(copy_cmd_line , cmd_line);
-  token = strtok(copy_cmd_line," ");
+  this->token = strtok(copy_cmd_line," ");
 }
 
 bool SmallShell::cmdIsExternal(const char* cmd_line)
 {
-  //NOTE: strtok changes the source str
-  //TODO: fix other strtok() calls like this
-  char* cmd_line_copy = strdup(cmd_line);
-  char* cmd_name = strtok(cmd_line_copy, " ");
+  int length_line = strlen(cmd_line);
+  char copy_cmd_line[length_line+1];
+  strcpy(copy_cmd_line , cmd_line);
+  char* cmd_name= strtok(copy_cmd_line," "); 
   bool res = !(strcmp(cmd_name, "chprompt") == 0
           ||  strcmp(cmd_name, "pwd") == 0
           ||  strcmp(cmd_name, "showpid") == 0
@@ -256,7 +262,6 @@ bool SmallShell::cmdIsExternal(const char* cmd_line)
           ||  strcmp(cmd_name, "quit") == 0
           ||  strcmp(cmd_name, "cp") == 0    
           ||  strcmp(cmd_name, "timeout") == 0);
-  free(cmd_line_copy);
   return res;
 }
 
@@ -264,22 +269,23 @@ void SmallShell::executeCommand(char *cmd_line)
 {
   //TODO: else if -> if clauses or add else
   Command* cmd = CreateCommand(cmd_line);
-  bool need_to_wait = _isBackgroundComamnd(cmd_line) == false;
+  bool need_to_wait = (_isBackgroundComamnd(cmd_line) == false);
   int pid_special;
   if(cmd->redirection_flag == true)
   { 
+  cout << "we are in redirection_cmd command" << endl;
     pid_special = fork();
     if(pid_special > 0) //father
-   {
-    if(alarm_is_set)
     {
+     if(alarm_is_set)
+     {
       SetPidToTimeoutEntry(pid_special);
       alarm_is_set = false;
     }
 
     if(need_to_wait == false)
     {
-      jobs->addJob(cmd);
+      jobs->addJob(this, cmd);
     }
     else //foreground
     {
@@ -288,32 +294,33 @@ void SmallShell::executeCommand(char *cmd_line)
       waitpid(pid_special, NULL, 0); //pid is the son pid
       fg_pid = -1;
       fg_command = "";
+     }
     }
-   }
-   else if (pid_special == 0) //son
-   {
+    else if (pid_special == 0) //son
+    {
       setpgrp();
       cmd->execute(this);
-   }
-   else
-   { 
+    }
+    else
+    { 
       syscallFailedMsg("fork");
-   }
+    }
   }
   else if(cmd->pipe_flag == true)
   {
+  cout << "we are in pipe command" << endl;
     pid_special = fork();
-   if(pid_special > 0) //father
-   {
-    if(alarm_is_set)
+    if(pid_special > 0) //father
     {
+     if(alarm_is_set)
+     {
       SetPidToTimeoutEntry(pid_special);
       alarm_is_set = false;
     }
 
     if(need_to_wait == false)
     {
-      jobs->addJob(cmd);
+      jobs->addJob(this, cmd);
     }
     else //foreground
     {
@@ -322,32 +329,34 @@ void SmallShell::executeCommand(char *cmd_line)
       waitpid(pid_special, NULL, 0); //pid is the son pid
       fg_pid = -1;
       fg_command = "";
+     }
     }
-   }
-   else if (pid_special == 0) //son
-   {
+    else if (pid_special == 0) //son
+    {
       setpgrp();
       cmd->execute(this);
-   }
-   else
-   { 
+    }
+    else
+    { 
       syscallFailedMsg("fork");
-   }
+    }
   }
   else if(cmdIsExternal(cmd_line))
   {
-  int pid = fork();
-  if(pid > 0) //father
-  {
-    if(alarm_is_set)
+  cout << "we are in external command" << endl;
+  return;
+    int pid = fork();
+    if(pid > 0) //father
     {
+     if(alarm_is_set)
+     {
       SetPidToTimeoutEntry(pid);
       alarm_is_set = false;
     }
 
     if(need_to_wait == false)
     {
-      jobs->addJob(cmd);
+      jobs->addJob(this, cmd);
     }
     else //foreground
     {
@@ -356,30 +365,27 @@ void SmallShell::executeCommand(char *cmd_line)
       waitpid(pid, NULL, 0); //pid is the son pid
       fg_pid = -1;
       fg_command = "";
+     }
     }
-  }
-  else if (pid == 0) //son
-  {
+    else if (pid == 0) //son
+    {
       setpgrp();
       cmd->execute(this);
-  }
-  else
-  { 
-      syscallFailedMsg("fork");
-  }
-
+    }
+    else
+    { 
+     syscallFailedMsg("fork");
+    }
   }//if cmd is external - end clause
-
      //for built in command
-    cmd->execute(this);
+  cmd->execute(this);
 }
 
 
-//TODO: save on smash->smash_msg the new msg
 void ChpromptCommand::execute(SmallShell* smash)
 {
   BuiltInCommand::execute(smash); //calls BuiltInCommand::execute
-  string new_smash_msg = smash_msg.c_str();
+  string new_smash_msg = smash->smash_msg.c_str();
   string end_of_prompt = "> ";
   int count = 0;
   while (token != NULL)
@@ -392,18 +398,20 @@ void ChpromptCommand::execute(SmallShell* smash)
       }
       else if (count == 1) //the next prompt we need to print
       {
-          new_smash_msg = token;
+          std::string str(token);
+          new_smash_msg = str; 
           //strcpy(new_smash_msg , token);
           count++;
           break;
       }
-      if (count == 1)
-      {
-          new_smash_msg = "smash";
-      }
-      new_smash_msg = new_smash_msg + end_of_prompt;
-      //strncat(new_smash_msg, end_of_prompt, 2);
   }
+  if (count == 1)
+  {
+  new_smash_msg = "smash";
+  }
+  new_smash_msg = new_smash_msg + end_of_prompt;
+  smash->smash_msg = new_smash_msg;
+  //strncat(new_smash_msg, end_of_prompt, 2); 
 }
 
 void ShowPidCommand::execute(SmallShell* smash)
@@ -424,8 +432,10 @@ void GetCurrDirCommand::execute(SmallShell* smash)
 
 void CdCommand::execute(SmallShell* smash)
 {
-  BuiltInCommand::execute(smash);
- 
+  int length_line = strlen(cmd_line);
+  char copy_cmd_line[length_line+1];
+  strcpy(copy_cmd_line , cmd_line);
+  this->token = strtok(copy_cmd_line," ");
   char* path;
   char* newpath;
   char buffer[80];
@@ -435,7 +445,6 @@ void CdCommand::execute(SmallShell* smash)
     smash->syscallFailedMsg("getcwd");
   }
   int count=0;
-
   while(token != NULL)
   {
     if (count== 0)
@@ -453,34 +462,37 @@ void CdCommand::execute(SmallShell* smash)
     }
     else if(count == 2)
     {
-      perror("smash error: cd: too many arguments");
+      cout<< "smash error: cd: too many arguments" <<endl;
+      free(newpath);
       return;
     }
   }
   if(strcmp(newpath, "-") == 0) //go to old path
   {
-     if(strcmp(oldpath.c_str(),"0") == 0)
+     if(strcmp(smash->oldpath.c_str(),"0") == 0)
      {
-        perror("smash error: cd: OLDPWD not set"); 
+        cout << "smash error: cd: OLDPWD not set"<<endl; 
      }
      else 
      {
-        int number_check = chdir(oldpath.c_str());
+        int number_check = chdir(smash->oldpath.c_str());
         if(number_check == -1)
         {
           smash->syscallFailedMsg("chdir");
         }
-        oldpath = path;
+        std::string str1(path);
+        smash->oldpath = str1;
         //strcpy(oldpath, path);
     }
   }
   else if(chdir(newpath) != 0)
   { 
-    perror("there is no such existing path");
+   perror("smash error: chdir failed");
   }
   else
   {
-    oldpath = path;
+    std::string str2(path);
+    smash->oldpath = str2;
     //strcpy(oldpath, path);
   }
   free(newpath);
