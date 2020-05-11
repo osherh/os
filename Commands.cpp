@@ -285,7 +285,7 @@ void SmallShell::executeCommand(char *cmd_line)
 
     if(need_to_wait == false)
     {
-      jobs->addJob(this, cmd);
+      jobs->addJob(cmd);
     }
     else //foreground
     {
@@ -320,7 +320,7 @@ void SmallShell::executeCommand(char *cmd_line)
 
     if(need_to_wait == false)
     {
-      jobs->addJob(this, cmd);
+      jobs->addJob(cmd);
     }
     else //foreground
     {
@@ -356,7 +356,7 @@ void SmallShell::executeCommand(char *cmd_line)
 
     if(need_to_wait == false)
     {
-      jobs->addJob(this, cmd);
+      jobs->addJob(cmd);
     }
     else //foreground
     {
