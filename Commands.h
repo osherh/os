@@ -14,12 +14,11 @@ class Command
 {
  public:
   char* cmd_line;
-  std::string oldpath = "0";
   char* token;
-  int special_command_num=-1;
+  int special_command_num;
   char* fname;
-  bool redirection_flag = false;
-  bool pipe_flag= false;
+  bool redirection_flag;
+  bool pipe_flag;
   Command(char* cmd_line);
   virtual ~Command();
   virtual void execute(SmallShell* smash) = 0;
@@ -189,9 +188,9 @@ class SmallShell
   SmallShell();
  
  public:
-  
+  std::string oldpath;
   pid_t smash_pid;
-  std::string smash_msg;
+  std::string smash_msg = "smash> ";
   pid_t fg_pid;
   std::string fg_command;
   JobsList* jobs;
