@@ -115,11 +115,11 @@ class JobsList
   public:
   JobsList();
   ~JobsList();
-  void addJob(SmallShell* smash, Command* cmd, bool isStopped = false);
-  void addStoppedJob(SmallShell* smash, pid_t pid, char* cmd);
-  void printJobsList(SmallShell* smash);
+  void addJob(Command* cmd, bool isStopped = false);
+  void addStoppedJob(pid_t pid, char* cmd);
+  void printJobsList();
   void killAllJobs(SmallShell* smash);
-  void removeFinishedJobs(SmallShell* smash);
+  void removeFinishedJobs();
   JobEntry * getJobById(int jobId);
   void removeJobById(int jobId);
   JobEntry * getLastJob(int* lastJobId);
@@ -187,14 +187,9 @@ class SmallShell
   SmallShell();
  
  public:
-  std::string oldpath;
-  pid_t smash_pid;
-  std::string smash_msg = "smash> ";
-  pid_t fg_pid;
-  std::string fg_command;
-  JobsList* jobs;
-  std::list<TimeoutEntry*>* timeouts;
+  std::string smash_msg;
   bool alarm_is_set;
+  std::string oldpath;
 
   Command *CreateCommand(char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor
@@ -211,14 +206,18 @@ class SmallShell
 
   //timeout
   void SetPidToTimeoutEntry(pid_t pid);
-  TimeoutEntry* getTimeoutEntry();
-  void removeTimeoutEntryByPid(pid_t pid);
-
+  
   //process
   bool process_status_is_done(pid_t pid);
   bool cmdIsExternal(const char* command);
 
   void syscallFailedMsg(std::string syscall_name);
 };
+
+extern pid_t smash_pid;
+extern pid_t fg_pid;
+extern std::string fg_command;
+extern JobsList* jobs;
+extern std::list<TimeoutEntry*>* timeouts;
 
 #endif //SMASH_COMMAND_H_
