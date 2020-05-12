@@ -15,6 +15,12 @@ using namespace std;
 
 const std::string WHITESPACE = " \n\r\t\f\v";
 
+JobsList* jobs = new JobsList();
+std::list<TimeoutEntry*>* timeouts = new std::list<TimeoutEntry*>();
+pid_t smash_pid;
+pid_t fg_pid = -1;
+std::string fg_command = "";
+
 #if 0
 #define FUNC_ENTRY()  \
   cerr << __PRETTY_FUNCTION__ << " --> " << endl;
@@ -88,19 +94,16 @@ void _removeBackgroundSign(char* cmd_line) {
 
 SmallShell::SmallShell() 
 {
-  this->oldpath = "0";
-  this->smash_pid = getpid();
-	this->smash_msg = "smash> ";
-  this->fg_command = "";
-  this->fg_pid = -1;
-	this->jobs = new JobsList();
-  this->timeouts = new std::list<TimeoutEntry*>();
   this->alarm_is_set = false;
+  this->oldpath = "0";
+  this->smash_msg = "smash> ";
+
+  smash_pid = getpid();
 }
 
 SmallShell::~SmallShell() 
 {
-	delete jobs;
+  delete jobs;
 
   for (std::list<TimeoutEntry*>::iterator it = timeouts->begin(); it != timeouts->end(); ++it)
   {
@@ -118,15 +121,21 @@ Command * SmallShell::CreateCommand(char* cmd_line)
   string cmd_s = string(cmd_line);
   if(cmd_s.find(">") != std::string::npos)
   {
-   Command* redirection_cmd = new RedirectionCommand(cmd_line);
-   redirection_cmd->redirection_flag = true;
-   return redirection_cmd;
+    Command* redirection_cmd = new RedirectionCommand(cmd_line);
+    redirection_cmd->redirection_flag = true;
+    return redirection_cmd;
   }
   else if(cmd_s.find("|") != std::string::npos)
   {
     Command* pipe_cmd = new PipeCommand(cmd_line);
     pipe_cmd->pipe_flag = true;
     return pipe_cmd;
+  }
+  else if(cmd_s.find("timeout") == 0)
+  {
+    Command* timeout_cmd = new TimeoutCommand(cmd_line);
+    timeout_cmd->timeout_flag = true;
+    return timeout_cmd;
   }
   else if(cmd_s.find("chprompt") == 0) //1
   {
@@ -172,11 +181,6 @@ Command * SmallShell::CreateCommand(char* cmd_line)
   {
     return new QuitCommand(cmd_line);    
   }
-
- else if(cmd_s.find("timeout") == 0)
- {
-    return new TimeoutCommand(cmd_line);
- }
  else if(cmd_s.find("cp")==0)
  {
     return new CopyCommand(cmd_line);
@@ -194,6 +198,7 @@ Command::Command(char* cmd_line)
   this->cmd_line = cmd_line;
   this->redirection_flag = false;
   this->pipe_flag = false;
+  this->timeout_flag = false;
   this->special_command_num = -1;
 
 }
@@ -262,130 +267,58 @@ bool SmallShell::cmdIsExternal(const char* cmd_line)
   return res;
 }
 
+void SmallShell::executeCommandAux(char* cmd_line, bool need_to_wait, Command* cmd)
+{
+    pid_t pid_special = fork();
+    if(pid_special > 0) //father
+    {
+     	if(alarm_is_set)
+     	{
+          SetPidToTimeoutEntry(pid_special);
+      		alarm_is_set = false;
+    	}
+    		
+    	if(need_to_wait == false) //background
+    	{
+        jobs->addJob(pid_special, cmd->cmd_line);
+    	}
+    	else //foreground
+    	{
+      		fg_pid = pid_special;
+      		fg_command = cmd->cmd_line;
+      		waitpid(pid_special, NULL, 0); //pid is the son pid
+      		fg_pid = -1;
+      		fg_command = "";
+     	}
+    }
+    else if (pid_special == 0) //son
+   	{
+     	  setpgrp();
+      	cmd->execute(this);
+   	}
+   	else
+   	{ 
+   		syscallFailedMsg("fork");
+   	}
+}
+
 void SmallShell::executeCommand(char *cmd_line)
 {
-  //TODO: else if -> if clauses or add else
   Command* cmd = CreateCommand(cmd_line);
   bool need_to_wait = (_isBackgroundComamnd(cmd_line) == false);
-  int pid_special;
-  if(cmd->redirection_flag == true)
-  { 
-    pid_special = fork();
-    if(pid_special > 0) //father
-    {
-     if(alarm_is_set)
-     {
-      SetPidToTimeoutEntry(pid_special);
-      alarm_is_set = false;
-     }
-     if(need_to_wait == false)
-     {
-      jobs->addJob(this, cmd);
-     }
-     else //foreground
-     {
-      fg_pid = pid_special;
-      fg_command = cmd_line;
-      waitpid(pid_special, NULL, 0); //pid is the son pid
-      fg_pid = -1;
-      fg_command = "";
-     }
-    }
-    else if (pid_special == 0) //son
-    {
-      setpgrp();
-      cmd->execute(this);
-      quick_exit(0);
-    }
-    else
-    { 
-      syscallFailedMsg("fork");
-    }
-  }
-  else if(cmd->pipe_flag == true)
+  if(cmd->redirection_flag == true || cmd->pipe_flag == true || cmd->timeout_flag == true || cmdIsExternal(cmd_line))
+	{
+    executeCommandAux(cmd_line, need_to_wait, cmd);  
+  }  
+  else
   {
-  cout << "we are in pipe command" << endl;
-    pid_special = fork();
-    if(pid_special > 0) //father
-    {
-     if(alarm_is_set)
-     {
-      SetPidToTimeoutEntry(pid_special);
-      alarm_is_set = false;
-     }
-     if(need_to_wait == false)
-     {
-      jobs->addJob(this, cmd);
-     }
-     else //foreground
-     {
-      fg_pid = pid_special;
-      fg_command = cmd_line;
-      waitpid(pid_special, NULL, 0); //pid is the son pid
-      fg_pid = -1;
-      fg_command = "";
-     }
-    }
-    else if (pid_special == 0) //son
-    {
-      setpgrp();
-      cmd->execute(this);
-      quick_exit(0);
-    }
-    else
-    { 
-      syscallFailedMsg("fork");
-    }
-  }
-  else if(cmdIsExternal(cmd_line))
-  {
-  cout << "we are in external command" << endl;
-  return;
-    int pid = fork();
-    if(pid > 0) //father
-    {
-     if(alarm_is_set)
-     {
-      SetPidToTimeoutEntry(pid);
-      alarm_is_set = false;
-     }
-     if(need_to_wait == false)
-     {
-      jobs->addJob(this, cmd);
-     }
-     else //foreground
-     {
-      fg_pid = pid;
-      fg_command = cmd_line;
-      waitpid(pid, NULL, 0); //pid is the son pid
-      fg_pid = -1;
-      fg_command = "";
-     }
-    }
-    else if (pid == 0) //son
-    {
-      setpgrp();
-      cmd->execute(this);
-      quick_exit(0);
-    }
-    else
-    { 
-     syscallFailedMsg("fork");
-    }
-  }//if cmd is external - end clause
-   else
-  {  //for built in command
-   cmd->execute(this);
+    cmd->execute(this);
   }
 }
 
-
 void ChpromptCommand::execute(SmallShell* smash)
 {
-  int length_line = strlen(cmd_line);
-  char copy_cmd_line[length_line+1];
-  strcpy(copy_cmd_line , cmd_line);
-  this->token = strtok(copy_cmd_line," ");
+  BuiltInCommand::execute(smash); //calls BuiltInCommand::execute
   string new_smash_msg = smash->smash_msg.c_str();
   string end_of_prompt = "> ";
   int count = 0;
@@ -417,7 +350,7 @@ void ChpromptCommand::execute(SmallShell* smash)
 
 void ShowPidCommand::execute(SmallShell* smash)
 {
-   std::cout <<"smash pid is "<< smash->smash_pid << std::endl;
+   std::cout <<"smash pid is "<< smash_pid << std::endl;
 }
 
 void GetCurrDirCommand::execute(SmallShell* smash)
@@ -586,52 +519,67 @@ void JobsList::killAllJobs(SmallShell* smash)
   cout << "Linux-shell:";
 }
 
-bool SmallShell::process_status_is_done(pid_t pid)
-{
-  int status;
-  return waitpid(pid, &status, WNOHANG) > 0;
-}
-
-JobsList::JobEntry::JobEntry(pid_t pid, int job_id, bool is_stopped, char* command, time_t inserted_time)
+JobsList::JobEntry::JobEntry(pid_t pid, int job_id, bool is_stopped, char* command_name, time_t inserted_time)
 {
   this->pid = pid;
   this->job_id = job_id;
   this->is_stopped = is_stopped;
-  this->command = command;
+  
+  command = (char*)malloc(strlen(command_name) + 1);
+  strcpy(command, command_name);
+
   this->inserted_time = inserted_time;
 }
 
 JobsList::JobEntry::~JobEntry()
 {
-
+  free(command);
 }
 
-void JobsList::addJob(SmallShell* smash, Command* cmd, bool is_stopped)
+void JobsList::addJob(pid_t pid, char* command, bool is_stopped)
 {
-      smash->jobs->removeFinishedJobs(smash);
+//    cout << "we are in addJob()" << endl;  
+      jobs->removeFinishedJobs();
       int job_id = 1;
       if(!jobs_list->empty()) 
       {
         int lastJobId = 0;
-        smash->jobs->getLastJob(&lastJobId);
+        jobs->getLastJob(&lastJobId);
         job_id = lastJobId + 1;
       }
-      pid_t pid = getpid();
-      JobEntry* job_entry = new JobEntry(pid, job_id, is_stopped, cmd->cmd_line, time(NULL));
+      //cout << "addJob() cmd is " << cmd->cmd_line << " , pid = " << pid << endl;
+//    cout << "job command is " << cmd->cmd_line << endl;
+      JobEntry* job_entry = new JobEntry(pid, job_id, is_stopped, command, time(NULL));
+/* 
+      int i = 1;
+      for (std::list<JobEntry*>::iterator it = jobs_list->begin(); it != jobs_list->end(); ++it)
+      {
+          JobEntry* entry = *it;
+          cout << "job number " << i++ << " command on list is " << entry->command << endl; 
+      }
+*/
       jobs_list->push_back(job_entry);
+/*
+      int i = 1;
+      for (std::list<JobEntry*>::iterator it = jobs_list->begin(); it != jobs_list->end(); ++it)
+      {
+          JobEntry* entry = *it;
+          cout << "job number " << i++ << " command on list is " << entry->command << endl; 
+      }
+*/
 }
 
-void JobsList::addStoppedJob(SmallShell* smash, pid_t pid, char* cmd)
+void JobsList::addStoppedJob(pid_t pid, char* command)
 {
-      smash->jobs->removeFinishedJobs(smash);
+      jobs->removeFinishedJobs();
       int job_id = 1;
       if(!jobs_list->empty())
       {
         int lastJobId = 0;
-        smash->jobs->getLastJob(&lastJobId);
+        jobs->getLastJob(&lastJobId);
         job_id = lastJobId + 1;
       }
-      JobEntry* job_entry = new JobEntry(pid, job_id, true, cmd, time(NULL));
+      JobEntry* job_entry = new JobEntry(pid, job_id, true, command, time(NULL));
       jobs_list->push_back(job_entry);
 }
 
@@ -647,35 +595,59 @@ void JobsList::removeJobById(int job_id)
   }
 }
 
-void JobsList::removeFinishedJobs(SmallShell* smash)
+void JobsList::removeFinishedJobs()
 {
+  //cout <<"we are on removeFinishedJobs()"<<endl;
+  /*if(!jobs_list->empty())
+  {
+      cout << "remove finished jobs - start: " << "1st job is " << (*(jobs_list->begin()))->command <<endl;
+  }
+  else
+  {
+      cout <<"jobs list is empty"<<endl;
+  }*/
   for (std::list<JobEntry*>::iterator it = jobs_list->begin(); it != jobs_list->end(); ++it)
 	{
     JobEntry* job_entry = *it;
-		if(smash->process_status_is_done(job_entry->pid))
+    int status;
+    bool process_status_is_done = waitpid(job_entry->pid, &status, WNOHANG) > 0;
+    if(process_status_is_done)
 		{
-			smash->jobs->removeJobById(job_entry->job_id);
+      cout<<"process " <<job_entry->pid << " is done and removed from job list"<<endl;
+			jobs->removeJobById(job_entry->job_id);
 		}
 	}
+  /*if(!jobs_list->empty())
+  {
+      cout << "remove finished jobs - end: " << "1st job is " << (*(jobs_list->begin()))->command <<endl;
+  }
+  else
+  {
+      cout <<"jobs list is empty"<<endl;
+  }*/
 }
 
-void JobsList::printJobsList(SmallShell* smash)
+void JobsList::printJobsList()
 {
-	smash->jobs->removeFinishedJobs(smash);
+	jobs->removeFinishedJobs();
+	//cout << "we are on print jobs" << endl;
   for (std::list<JobEntry*>::iterator it = jobs_list->begin(); it != jobs_list->end(); ++it)
 	{
     JobEntry* job_entry = *it;
+    //cout << "job command is: " << job_entry->command << endl;
 		time_t curr_time = time(NULL);
 		double time_elapsed = difftime(curr_time, job_entry->inserted_time); 
-		stringstream job_stream ;
-    job_stream << "[" << job_entry->job_id << "]" << job_entry->command << " : " << job_entry->pid << " " << time_elapsed << " secs";
-	  if(job_entry->is_stopped)
-    {
-      job_stream << " (stopped)";
-    }
-    cout << job_stream.str() << endl; 
-  }
+		//cout << "time passed is " << time_elapsed << endl;
+    stringstream job_stream ;
+    	job_stream << "[" << job_entry->job_id << "] " << job_entry->command << " : " << job_entry->pid << " " << time_elapsed << " secs";
+	  	if(job_entry->is_stopped)
+    	{
+      		job_stream << " (stopped)";
+    	}
+    	cout << job_stream.str() << endl; 
+  	}
 }
+
 bool JobsList::isEmpty()
 {
   return jobs_list->empty();
@@ -698,7 +670,7 @@ bool JobsList::stopped_joblist_is_empty()
 
 void JobsCommand::execute(SmallShell* smash)
 {
-  smash->jobs->printJobsList(smash);
+  jobs->printJobsList();
 }
 
 void KillCommand::execute(SmallShell* smash)
@@ -768,7 +740,7 @@ void KillCommand::execute(SmallShell* smash)
       else if(count == 2) // we have both signal and job_id
       {
         int job_id = atoi(token);
-        JobsList::JobEntry* job_found = smash->jobs->getJobById(job_id);
+        JobsList::JobEntry* job_found = jobs->getJobById(job_id);
         if(job_found == NULL)
         {
           stringstream job_stream;
@@ -803,7 +775,7 @@ void QuitCommand::execute(SmallShell* smash)
   {
     if(strcmp(token, "kill") == 0)
     {
-      smash->jobs->killAllJobs(smash);
+      jobs->killAllJobs(smash);
       exit(1);
     }
     token = strtok(NULL, " ");  
@@ -827,7 +799,7 @@ void FgCommand::execute(SmallShell* smash)
  }
  else if (count == 1) //no args given
  {
-   bool is_empty = smash->jobs->isEmpty();
+   bool is_empty = jobs->isEmpty();
    if (is_empty == true)
    {
     perror("smash error: fg: jobs list is empty");
@@ -835,17 +807,17 @@ void FgCommand::execute(SmallShell* smash)
    else
    {
     int last_job_id;
-    wanted_job = smash->jobs->getLastJob(&last_job_id);
-    smash->fg_pid = wanted_job->pid;
-    smash->fg_command = cmd_line;
+    wanted_job = jobs->getLastJob(&last_job_id);
+    fg_pid = wanted_job->pid;
+    fg_command = cmd_line;
     smash->sendSignal(wanted_job->pid, SIGCONT);
     stringstream job_stream;
     job_stream << wanted_job->command << " : " << wanted_job->pid << " " << endl;
     cout << job_stream.str();
     waitpid(wanted_job->pid, NULL, 0);
-    smash->fg_pid = -1;
-    smash->fg_command = "";
-    smash->jobs->removeJobById(wanted_job->job_id);
+    fg_pid = -1;
+    fg_command = "";
+    jobs->removeJobById(wanted_job->job_id);
     return;
    }
  }
@@ -871,7 +843,7 @@ void FgCommand::execute(SmallShell* smash)
 	  }
     else
     {
-      wanted_job = smash->jobs->getJobById(job_number);
+      wanted_job = jobs->getJobById(job_number);
       if (wanted_job == NULL)
       {
         stringstream job_stream;
@@ -880,16 +852,16 @@ void FgCommand::execute(SmallShell* smash)
 	    }
       else
       {
-       smash->fg_pid = wanted_job->pid;
-       smash->fg_command = cmd_line;
+       fg_pid = wanted_job->pid;
+       fg_command = cmd_line;
        smash->sendSignal(wanted_job->pid, SIGCONT);
        stringstream job_stream;
        job_stream << wanted_job->command << " : " << wanted_job->pid << " " << endl;
        cout << job_stream.str();
        waitpid(wanted_job->pid, NULL, 0);
-       smash->fg_pid = -1;
-       smash->fg_command = "";
-       smash->jobs->removeJobById(wanted_job->job_id);
+       fg_pid = -1;
+       fg_command = "";
+       jobs->removeJobById(wanted_job->job_id);
 	    }
     }
   }
@@ -913,7 +885,7 @@ void BgCommand::execute(SmallShell* smash)
   }
   else if(count==1)
   {
-   bool is_empty = smash->jobs->stopped_joblist_is_empty();
+   bool is_empty = jobs->stopped_joblist_is_empty();
    if (is_empty == true)
    {
     perror("smash error: bg: there is no stopped jobs to resume");
@@ -921,7 +893,7 @@ void BgCommand::execute(SmallShell* smash)
    else
    {
     int last_stopped_job_id;
-    stopped_job = smash->jobs->getLastStoppedJob(&last_stopped_job_id);
+    stopped_job = jobs->getLastStoppedJob(&last_stopped_job_id);
     smash->sendSignal(stopped_job->pid, SIGCONT);
     stringstream job_stream;
     job_stream << stopped_job->command << " : " << stopped_job->pid << " " << endl;
@@ -948,7 +920,7 @@ void BgCommand::execute(SmallShell* smash)
 	  }
     else
     {
-     stopped_job = smash->jobs->getJobById(job_num);
+     stopped_job = jobs->getJobById(job_num);
      if (stopped_job == NULL)
      {
       stringstream not_exist_msg;
@@ -995,42 +967,13 @@ void TimeoutCommand::execute(SmallShell* smash)
     {
         perror("smash error: timeout: invalid arguments");
     }
-    smash->jobs->addJob(smash, this);
     alarm(duration_num);   //arranges for a SIGALRM signal to be delivered to the calling process in duration seconds
     smash->alarm_is_set = true;
     TimeoutEntry* timeout_entry = new TimeoutEntry();
     timeout_entry->timestamp = time(NULL);
     timeout_entry->duration = duration_num;
-    smash->timeouts->push_back(timeout_entry);
+    timeouts->push_back(timeout_entry);
     smash->executeCommand(command);
-}
-
-TimeoutEntry* SmallShell::getTimeoutEntry()
-{
-    for (std::list<TimeoutEntry*>::reverse_iterator rit = timeouts->rbegin(); rit != timeouts->rend(); ++rit)
-    {
-        time_t curr_time = time(NULL);
-        TimeoutEntry* timeout_entry = *rit;
-        if(difftime(curr_time, timeout_entry->timestamp) == timeout_entry->duration)
-        {
-          return timeout_entry;
-        }
-    }   
-    return NULL;
-}
-
-void SmallShell::removeTimeoutEntryByPid(pid_t pid)
-{
-    //cant just remove by remove_if() since there can be multiple entries with this pid
-    for (std::list<TimeoutEntry*>::reverse_iterator rit = timeouts->rbegin(); rit != timeouts->rend(); ++rit)
-    {
-      TimeoutEntry* timeout_entry = *rit; 
-      if(timeout_entry->pid == pid)
-      {
-        timeouts->remove(timeout_entry);
-        break;
-      }
-    }
 }
 
 void SmallShell::SetPidToTimeoutEntry(pid_t pid)
@@ -1191,15 +1134,15 @@ void CopyCommand::execute(SmallShell* smash)
     {
       if(need_to_wait == false)
       {
-          smash->jobs->addJob(smash, this);
+          jobs->addJob(pid, cmd_line);
       }
       else //foreground
       {
-          smash->fg_pid = pid;
-          smash->fg_command = cmd_line;
+          fg_pid = pid;
+          fg_command = cmd_line;
           waitpid(pid, NULL, 0); //pid is the son pid
-          smash->fg_pid = -1;
-          smash->fg_command = "";
+          fg_pid = -1;
+          fg_command = "";
       }
     }
     else if (pid == 0) //son

@@ -18,6 +18,7 @@ class Command
   int special_command_num;
   bool redirection_flag;
   bool pipe_flag;
+  bool timeout_flag;
   Command(char* cmd_line);
   virtual ~Command();
   virtual void execute(SmallShell* smash) = 0;
@@ -105,7 +106,8 @@ class JobsList
       JobEntry(pid_t pid, int job_id, bool is_stopped, char* command, time_t inserted_time);
       ~JobEntry();
   };
-  std::list<JobEntry*>* jobs_list;  
+
+  std::list<JobEntry*>* jobs_list;
 
   friend class KillCommand;
   friend class FgCommand;
@@ -113,13 +115,14 @@ class JobsList
   friend class TimeoutCommand;
 
   public:
+
   JobsList();
   ~JobsList();
-  void addJob(SmallShell* smash, Command* cmd, bool isStopped = false);
-  void addStoppedJob(SmallShell* smash, pid_t pid, char* cmd);
-  void printJobsList(SmallShell* smash);
+  void addJob(pid_t pid, char* cmd, bool isStopped = false);
+  void addStoppedJob(pid_t pid, char* cmd);
+  void printJobsList();
   void killAllJobs(SmallShell* smash);
-  void removeFinishedJobs(SmallShell* smash);
+  void removeFinishedJobs();
   JobEntry * getJobById(int jobId);
   void removeJobById(int jobId);
   JobEntry * getLastJob(int* lastJobId);
@@ -187,14 +190,9 @@ class SmallShell
   SmallShell();
  
  public:
-  std::string oldpath;
-  pid_t smash_pid;
-  std::string smash_msg = "smash> ";
-  pid_t fg_pid;
-  std::string fg_command;
-  JobsList* jobs;
-  std::list<TimeoutEntry*>* timeouts;
+  std::string smash_msg;
   bool alarm_is_set;
+  std::string oldpath;
 
   Command *CreateCommand(char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor
@@ -207,18 +205,24 @@ class SmallShell
   }
   ~SmallShell();
   void executeCommand(char* cmd_line);  
+  void executeCommandAux(char* cmd_line, bool need_to_wait, Command* cmd);
+
   void sendSignal(pid_t pid, int signal);
 
   //timeout
   void SetPidToTimeoutEntry(pid_t pid);
-  TimeoutEntry* getTimeoutEntry();
-  void removeTimeoutEntryByPid(pid_t pid);
-
+  
   //process
   bool process_status_is_done(pid_t pid);
   bool cmdIsExternal(const char* command);
 
   void syscallFailedMsg(std::string syscall_name);
 };
+
+extern pid_t smash_pid;
+extern pid_t fg_pid;
+extern std::string fg_command;
+extern JobsList* jobs;
+extern std::list<TimeoutEntry*>* timeouts;
 
 #endif //SMASH_COMMAND_H_
