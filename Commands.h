@@ -19,6 +19,7 @@ class Command
   char* fname;
   bool redirection_flag;
   bool pipe_flag;
+  bool timeout_flag;
   Command(char* cmd_line);
   virtual ~Command();
   virtual void execute(SmallShell* smash) = 0;
@@ -106,7 +107,8 @@ class JobsList
       JobEntry(pid_t pid, int job_id, bool is_stopped, char* command, time_t inserted_time);
       ~JobEntry();
   };
-  std::list<JobEntry*>* jobs_list;  
+
+  std::list<JobEntry*>* jobs_list;
 
   friend class KillCommand;
   friend class FgCommand;
@@ -114,9 +116,10 @@ class JobsList
   friend class TimeoutCommand;
 
   public:
+
   JobsList();
   ~JobsList();
-  void addJob(Command* cmd, bool isStopped = false);
+  void addJob(pid_t pid, char* cmd, bool isStopped = false);
   void addStoppedJob(pid_t pid, char* cmd);
   void printJobsList();
   void killAllJobs(SmallShell* smash);
@@ -203,6 +206,8 @@ class SmallShell
   }
   ~SmallShell();
   void executeCommand(char* cmd_line);  
+  void executeCommandAux(char* cmd_line, bool need_to_wait, Command* cmd);
+
   void sendSignal(pid_t pid, int signal);
 
   //timeout
