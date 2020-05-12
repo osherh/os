@@ -247,7 +247,7 @@ bool SmallShell::cmdIsExternal(const char* cmd_line)
   int length_line = strlen(cmd_line);
   char copy_cmd_line[length_line+1];
   strcpy(copy_cmd_line , cmd_line);
-  char* cmd_name= strtok(copy_cmd_line," "); 
+  char* cmd_name= strtok(copy_cmd_line," ");
   bool res = !(strcmp(cmd_name, "chprompt") == 0
           ||  strcmp(cmd_name, "pwd") == 0
           ||  strcmp(cmd_name, "showpid") == 0
@@ -295,6 +295,7 @@ void SmallShell::executeCommand(char *cmd_line)
     {
       setpgrp();
       cmd->execute(this);
+      quick_exit(0);
     }
     else
     { 
@@ -329,6 +330,7 @@ void SmallShell::executeCommand(char *cmd_line)
     {
       setpgrp();
       cmd->execute(this);
+      quick_exit(0);
     }
     else
     { 
@@ -364,6 +366,7 @@ void SmallShell::executeCommand(char *cmd_line)
     {
       setpgrp();
       cmd->execute(this);
+      quick_exit(0);
     }
     else
     { 
@@ -1077,20 +1080,19 @@ void RedirectionCommand::execute(SmallShell* smash)
   }
  if(this->special_command_num == 0)
  {
-  int newstdout = open(fname, O_WRONLY | O_CREAT | O_TRUNC);
+  int newstdout = open(fname, O_WRONLY | O_CREAT | O_TRUNC,S_IRWXU);
   dup2(newstdout, 1);
   close(newstdout);
  }
  else if(this->special_command_num == 1)
  {
-  int newstdout = open(fname, O_WRONLY | O_CREAT | O_APPEND);
+  int newstdout = open(fname, O_WRONLY | O_CREAT | O_APPEND,S_IRWXU);
   dup2(newstdout, 1);
   close(newstdout);
  }
  smash->executeCommand(cmd_section);
  free(cmd_section);
  free(fname);
- close(1);
 }
 
 void PipeCommand::execute(SmallShell* smash)
@@ -1148,6 +1150,7 @@ void PipeCommand::execute(SmallShell* smash)
     close(fd[1]);
     smash->executeCommand(cmd_section1);
     free(cmd_section1);
+    quick_exit(0);
   }
   else
   {
@@ -1158,7 +1161,8 @@ void PipeCommand::execute(SmallShell* smash)
       close(fd[0]);
       close(fd[1]);  
       smash->executeCommand(cmd_section2);
-      free(cmd_section2);   
+      free(cmd_section2); 
+      quick_exit(0);
     }
     else
     {
@@ -1201,12 +1205,12 @@ void CopyCommand::execute(SmallShell* smash)
     else if (pid == 0) //son
     {
         setpgrp();
-        int file1_descriptor = open(file1, O_RDONLY | O_CREAT);
+        int file1_descriptor = open(file1, O_RDONLY | O_CREAT,S_IRWXU);
         if(file1_descriptor == -1)
         {
             perror("the file cant be opened");
         }
-        int file2_descriptor = open(file2, O_WRONLY | O_CREAT | O_TRUNC);
+        int file2_descriptor = open(file2, O_WRONLY | O_CREAT | O_TRUNC,S_IRWXU);
         if(file2_descriptor == -1)
         {
             perror("the file cant be opened");
@@ -1222,6 +1226,7 @@ void CopyCommand::execute(SmallShell* smash)
         close(file2_descriptor);  
         free(file1);
         free(file2);
+        quick_exit(0);
     }
     else
     { 
