@@ -269,33 +269,17 @@ bool SmallShell::cmdIsExternal(const char* cmd_line)
 
 void SmallShell::executeCommandAux(char* cmd_line, bool need_to_wait, Command* cmd)
 {
-  //TODO: else if -> if clauses or add else
-  Command* cmd = CreateCommand(cmd_line);
-  bool need_to_wait = (_isBackgroundComamnd(cmd_line) == false);
-  int pid_special;
-  if(cmd->redirection_flag == true)
-  { 
-  cout << "we are in redirection_cmd command" << endl;
-    pid_special = fork();
+    pid_t pid_special = fork();
     if(pid_special > 0) //father
     {
-      //cout << "executeCommandAux() cmd is " << cmd_line << " , pid = " << pid_special << endl;
      	if(alarm_is_set)
      	{
-      		SetPidToTimeoutEntry(pid_special);
+          SetPidToTimeoutEntry(pid_special);
       		alarm_is_set = false;
     	}
     		
     	if(need_to_wait == false) //background
     	{
-        /*if(jobs->isEmpty())
-        {
-            cout << "jobs list is empty" << endl;
-        }
-        else
-        {
-            cout << " executeCommandAux() - Before addJob() when cmd is " << cmd->cmd_line << " the 1st job is " << (*(jobs->jobs_list->begin()))->command <<endl;
-        }*/
         jobs->addJob(pid_special, cmd->cmd_line);
     	}
     	else //foreground
@@ -309,10 +293,8 @@ void SmallShell::executeCommandAux(char* cmd_line, bool need_to_wait, Command* c
     }
     else if (pid_special == 0) //son
    	{
-        //cout << " executeCommandAux() - on son, when cmd is " << cmd->cmd_line << " the 1st job is " << (*(jobs->jobs_list->begin()))->command <<endl;
      	  setpgrp();
       	cmd->execute(this);
-        //cout << " executeCommandAux() - on son, when cmd is " << cmd->cmd_line << " the 1st job is " << (*(jobs->jobs_list->begin()))->command <<endl;
    	}
    	else
    	{ 
@@ -322,52 +304,16 @@ void SmallShell::executeCommandAux(char* cmd_line, bool need_to_wait, Command* c
 
 void SmallShell::executeCommand(char *cmd_line)
 {
-  //cout << "we are in SmallShell::executeCommand()" << endl;	
-
-  /*if(jobs->isEmpty())
-  {
-    cout << "jobs list is empty" << endl;
-  }else
-  {
-    cout << " executeCommand() - start: " << "1st job is " << (*(jobs->jobs_list->begin()))->command <<endl;
-  }*/
-
   Command* cmd = CreateCommand(cmd_line);
-  
-  /*if(jobs->isEmpty())
-  {
-    cout << "jobs list is empty" << endl;
-  }else
-  {
-    cout << " executeCommand() - after create cmd: " << "1st job is " << (*(jobs->jobs_list->begin()))->command <<endl;
-  }*/
-
   bool need_to_wait = (_isBackgroundComamnd(cmd_line) == false);
-
-  /*if(jobs->isEmpty())
-  {
-    cout << "jobs list is empty" << endl;
-  }else
-  {
-    cout << " executeCommand() - after _isBackgroundComamnd: " << "1st job is " << (*(jobs->jobs_list->begin()))->command <<endl;
-  }*/
-
   if(cmd->redirection_flag == true || cmd->pipe_flag == true || cmd->timeout_flag == true || cmdIsExternal(cmd_line))
 	{
-    /*if(jobs->isEmpty())
-    {
-      cout << "jobs list is empty" << endl;
-    }else
-    {
-      cout << " executeCommand() - after cmdIsExternal(): " << "1st job is " << (*(jobs->jobs_list->begin()))->command <<endl;
-    }
-    cout << "command line is " << cmd_line << endl;
-    */
-    executeCommandAux(cmd_line, need_to_wait, cmd);    
-    else
-    {
-        cmd->execute(this);
-    }
+    executeCommandAux(cmd_line, need_to_wait, cmd);  
+  }  
+  else
+  {
+    cmd->execute(this);
+  }
 }
 
 void ChpromptCommand::execute(SmallShell* smash)
