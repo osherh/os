@@ -269,7 +269,14 @@ bool SmallShell::cmdIsExternal(const char* cmd_line)
 
 void SmallShell::executeCommandAux(char* cmd_line, bool need_to_wait, Command* cmd)
 {
-    pid_t pid_special = fork();
+  //TODO: else if -> if clauses or add else
+  Command* cmd = CreateCommand(cmd_line);
+  bool need_to_wait = (_isBackgroundComamnd(cmd_line) == false);
+  int pid_special;
+  if(cmd->redirection_flag == true)
+  { 
+  cout << "we are in redirection_cmd command" << endl;
+    pid_special = fork();
     if(pid_special > 0) //father
     {
       //cout << "executeCommandAux() cmd is " << cmd_line << " , pid = " << pid_special << endl;
@@ -355,19 +362,12 @@ void SmallShell::executeCommand(char *cmd_line)
       cout << " executeCommand() - after cmdIsExternal(): " << "1st job is " << (*(jobs->jobs_list->begin()))->command <<endl;
     }
     cout << "command line is " << cmd_line << endl;
-    
-    if(need_to_wait)
+    */
+    executeCommandAux(cmd_line, need_to_wait, cmd);    
+    else
     {
-        cout << "it is a forground command - need to wait" << endl;
-    }*/
-		executeCommandAux(cmd_line, need_to_wait, cmd);
-	  //cout << " executeCommand() - after executeCommandAux(): " << "1st job is " << (*(jobs->jobs_list->begin()))->command <<endl;
-  }
-  else  //for built in command
-  {
-    //cout << "command line is " << cmd_line << endl;
-  	cmd->execute(this);
-  }  
+        cmd->execute(this);
+    }
 }
 
 void ChpromptCommand::execute(SmallShell* smash)
@@ -1046,11 +1046,13 @@ void RedirectionCommand::execute(SmallShell* smash)
   char copy_cmd[length_cmd+1];
   strcpy(copy_cmd , cmd_line);
   char* cmd_section;
+  char* fname;
   token = strtok(copy_cmd," ");
   while(token!=NULL)
   { 
     if(found_sign==true)
     {
+      fname = (char*) malloc(strlen(token) + 1);
       strcpy(fname,token); 
     }
     if(token[0] == '>')
@@ -1075,18 +1077,20 @@ void RedirectionCommand::execute(SmallShell* smash)
   }
  if(this->special_command_num == 0)
  {
-  int newstdout = open(this->fname, O_WRONLY | O_CREAT | O_TRUNC);
+  int newstdout = open(fname, O_WRONLY | O_CREAT | O_TRUNC);
   dup2(newstdout, 1);
   close(newstdout);
  }
  else if(this->special_command_num == 1)
  {
-  int newstdout = open(this->fname, O_WRONLY | O_CREAT | O_APPEND);
+  int newstdout = open(fname, O_WRONLY | O_CREAT | O_APPEND);
   dup2(newstdout, 1);
   close(newstdout);
  }
  smash->executeCommand(cmd_section);
  free(cmd_section);
+ free(fname);
+ close(1);
 }
 
 void PipeCommand::execute(SmallShell* smash)
@@ -1166,10 +1170,12 @@ void PipeCommand::execute(SmallShell* smash)
 
 void CopyCommand::execute(SmallShell* smash)
 {
-    BuiltInCommand::execute(smash);
+    int length_line = strlen(cmd_line);
+    char copy_cmd_line[length_line+1];
+    strcpy(copy_cmd_line , cmd_line);
+    token = strtok(copy_cmd_line," ");
     bool need_to_wait = _isBackgroundComamnd(cmd_line) == false;
   
-    token = strtok(cmd_line," ");
     token = strtok(NULL," ");
     char* file1 = (char*)malloc(strlen(token)+1);
     strcpy(file1,token);
