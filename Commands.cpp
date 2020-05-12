@@ -96,7 +96,7 @@ SmallShell::SmallShell()
 {
   this->alarm_is_set = false;
   this->oldpath = "0";
-  this->smash_msg = "smash> ";
+  this->smash_msg ="smash> ";
 
   smash_pid = getpid();
 }
