@@ -295,6 +295,7 @@ void SmallShell::executeCommandAux(char* cmd_line, bool need_to_wait, Command* c
    	{
      	  setpgrp();
       	cmd->execute(this);
+        quick_exit(0);
    	}
    	else
    	{ 
