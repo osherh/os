@@ -190,9 +190,9 @@ class SmallShell
   SmallShell();
  
  public:
-  std::string smash_msg;
+  std::string smash_msg ="smash> ";
   bool alarm_is_set;
-  std::string oldpath;
+  std::string oldpath = "0";
 
   Command *CreateCommand(char* cmd_line);
   SmallShell(SmallShell const&)      = delete; // disable copy ctor

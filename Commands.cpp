@@ -95,9 +95,6 @@ void _removeBackgroundSign(char* cmd_line) {
 SmallShell::SmallShell() 
 {
   this->alarm_is_set = false;
-  this->oldpath = "0";
-  this->smash_msg ="smash> ";
-
   smash_pid = getpid();
 }
 
@@ -293,7 +290,7 @@ void SmallShell::executeCommandAux(char* cmd_line, bool need_to_wait, Command* c
     }
     else if (pid_special == 0) //son
    	{
-     	  setpgrp();
+     	setpgrp();
       	cmd->execute(this);
         quick_exit(0);
    	}
@@ -762,6 +759,7 @@ void ExternalCommand::execute(SmallShell* smash)
 {
     char* args[] = { strdup("bash"), strdup("-c"), cmd_line, NULL};
     execv("/bin/bash", args);
+    cout<<"we are here"<<endl;
 }
 
 void QuitCommand::execute(SmallShell* smash)
@@ -1042,6 +1040,8 @@ void RedirectionCommand::execute(SmallShell* smash)
 void PipeCommand::execute(SmallShell* smash)
 {
  int new_fd;
+ int count1=0;
+ int count2=0;
  bool found_sign= false;
  int length_cmd = strlen(cmd_line);
   char copy_cmd[length_cmd+1];
@@ -1066,13 +1066,19 @@ void PipeCommand::execute(SmallShell* smash)
     }
     else if(token[0] != '|' && found_sign == false)
     {
+    if(count1==0){
       cmd_section1 = (char*)malloc(strlen(token)+1);
+      count1++;
+      }
       strcat(cmd_section1,token);
       strcat(cmd_section1," ");
 	  }
     else if(token[0] != '|' && found_sign == true && token[0] != '&')
     {
+    if(count2==0){
       cmd_section2 = (char*)malloc(strlen(token)+1);
+      count2++;
+      }
       strcat(cmd_section2,token);
       strcat(cmd_section2," ");
 	  }
@@ -1084,6 +1090,7 @@ void PipeCommand::execute(SmallShell* smash)
   if(this->special_command_num == 3)
   new_fd =2;
   
+
   int fd[2];
   pipe(fd);
   int pid1=fork();
@@ -1092,7 +1099,14 @@ void PipeCommand::execute(SmallShell* smash)
     dup2(fd[1],new_fd);
     close(fd[0]);
     close(fd[1]);
-    smash->executeCommand(cmd_section1);
+    if(smash->cmdIsExternal(cmd_section1))
+      {
+       Command* cmd1 = new ExternalCommand(cmd_section1);
+       cmd1->execute(smash);
+      }
+      else{
+      smash->executeCommand(cmd_section1);
+      }
     free(cmd_section1);
     quick_exit(0);
   }
@@ -1104,12 +1118,21 @@ void PipeCommand::execute(SmallShell* smash)
       dup2(fd[0],0);
       close(fd[0]);
       close(fd[1]);  
+      if(smash->cmdIsExternal(cmd_section2))
+      {
+       Command* cmd2 = new ExternalCommand(cmd_section2);
+       cmd2->execute(smash);
+      }
+      else{
       smash->executeCommand(cmd_section2);
+      }
       free(cmd_section2); 
       quick_exit(0);
     }
     else
     {
+      close(fd[0]);
+      close(fd[1]);
       waitpid(pid1,NULL,0);
       waitpid(pid2,NULL,0);
     }
