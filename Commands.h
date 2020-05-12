@@ -16,7 +16,6 @@ class Command
   char* cmd_line;
   char* token;
   int special_command_num;
-  char* fname;
   bool redirection_flag;
   bool pipe_flag;
   Command(char* cmd_line);

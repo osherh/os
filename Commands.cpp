@@ -270,7 +270,6 @@ void SmallShell::executeCommand(char *cmd_line)
   int pid_special;
   if(cmd->redirection_flag == true)
   { 
-  cout << "we are in redirection_cmd command" << endl;
     pid_special = fork();
     if(pid_special > 0) //father
     {
@@ -371,8 +370,10 @@ void SmallShell::executeCommand(char *cmd_line)
      syscallFailedMsg("fork");
     }
   }//if cmd is external - end clause
-     //for built in command
-  cmd->execute(this);
+   else
+  {  //for built in command
+   cmd->execute(this);
+  }
 }
 
 
@@ -1045,11 +1046,13 @@ void RedirectionCommand::execute(SmallShell* smash)
   char copy_cmd[length_cmd+1];
   strcpy(copy_cmd , cmd_line);
   char* cmd_section;
+  char* fname;
   token = strtok(copy_cmd," ");
   while(token!=NULL)
   { 
     if(found_sign==true)
     {
+      fname = (char*) malloc(strlen(token) + 1);
       strcpy(fname,token); 
     }
     if(token[0] == '>')
@@ -1074,18 +1077,20 @@ void RedirectionCommand::execute(SmallShell* smash)
   }
  if(this->special_command_num == 0)
  {
-  int newstdout = open(this->fname, O_WRONLY | O_CREAT | O_TRUNC);
+  int newstdout = open(fname, O_WRONLY | O_CREAT | O_TRUNC);
   dup2(newstdout, 1);
   close(newstdout);
  }
  else if(this->special_command_num == 1)
  {
-  int newstdout = open(this->fname, O_WRONLY | O_CREAT | O_APPEND);
+  int newstdout = open(fname, O_WRONLY | O_CREAT | O_APPEND);
   dup2(newstdout, 1);
   close(newstdout);
  }
  smash->executeCommand(cmd_section);
  free(cmd_section);
+ free(fname);
+ close(1);
 }
 
 void PipeCommand::execute(SmallShell* smash)
@@ -1165,10 +1170,12 @@ void PipeCommand::execute(SmallShell* smash)
 
 void CopyCommand::execute(SmallShell* smash)
 {
-    BuiltInCommand::execute(smash);
+    int length_line = strlen(cmd_line);
+    char copy_cmd_line[length_line+1];
+    strcpy(copy_cmd_line , cmd_line);
+    token = strtok(copy_cmd_line," ");
     bool need_to_wait = _isBackgroundComamnd(cmd_line) == false;
   
-    token = strtok(cmd_line," ");
     token = strtok(NULL," ");
     char* file1 = (char*)malloc(strlen(token)+1);
     strcpy(file1,token);
