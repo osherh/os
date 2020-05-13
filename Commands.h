@@ -14,7 +14,6 @@ class Command
 {
  public:
   char* cmd_line;
-  char* token;
   int special_command_num;
   bool redirection_flag;
   bool pipe_flag;
