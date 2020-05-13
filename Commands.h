@@ -205,7 +205,7 @@ class SmallShell
   }
   ~SmallShell();
   void executeCommand(char* cmd_line);  
-  void executeCommandAux(char* cmd_line, bool need_to_wait, Command* cmd);
+  void executeCommandAux(bool need_to_wait, Command* cmd);
 
   void sendSignal(pid_t pid, int signal);
 

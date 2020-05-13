@@ -238,10 +238,7 @@ ExternalCommand::ExternalCommand(char* cmd_line) : Command(cmd_line) {}
 
 void BuiltInCommand::execute(SmallShell* smash)
 { 
-  int length_line = strlen(cmd_line);
-  char copy_cmd_line[length_line+1];
-  strcpy(copy_cmd_line , cmd_line);
-  this->token = strtok(copy_cmd_line," ");
+  
 }
 
 bool SmallShell::cmdIsExternal(const char* cmd_line)
@@ -265,7 +262,7 @@ bool SmallShell::cmdIsExternal(const char* cmd_line)
   return res;
 }
 
-void SmallShell::executeCommandAux(char* cmd_line, bool need_to_wait, Command* cmd)
+void SmallShell::executeCommandAux(bool need_to_wait, Command* cmd)
 {
     int pid_special = fork();
     if(pid_special > 0) //father
@@ -291,7 +288,7 @@ void SmallShell::executeCommandAux(char* cmd_line, bool need_to_wait, Command* c
     }
     else if (pid_special == 0) //son
    	{
-     	setpgrp();
+     	  setpgrp();
       	cmd->execute(this);
         quick_exit(0);
    	}
@@ -303,11 +300,14 @@ void SmallShell::executeCommandAux(char* cmd_line, bool need_to_wait, Command* c
 
 void SmallShell::executeCommand(char *cmd_line)
 {
+// cout << cmd_line << " - part 1" << endl;
+  //cout <<"cmd is "<<cmd_line << endl;
   Command* cmd = CreateCommand(cmd_line);
   bool need_to_wait = (_isBackgroundComamnd(cmd_line) == false);
   if(cmd->redirection_flag == true || cmd->pipe_flag == true || cmd->timeout_flag == true || cmdIsExternal(cmd_line))
 	{
-    executeCommandAux(cmd_line, need_to_wait, cmd);  
+    executeCommandAux(need_to_wait, cmd);  
+//    cout << cmd_line << " - part 2" << endl;
   }  
   else
   {
@@ -317,17 +317,17 @@ void SmallShell::executeCommand(char *cmd_line)
 
 void ChpromptCommand::execute(SmallShell* smash)
 {
+  string old_msg ="smash";
   int length_line = strlen(cmd_line);
   char copy_cmd_line[length_line+1];
   strcpy(copy_cmd_line , cmd_line);
   this->token = strtok(copy_cmd_line," \r");
   string new_smash_msg;
-  string old_msg ="smash";
   string end_of_prompt = "> ";
   int count = 0;
   while (token != NULL)
   {
-      if (count == 0) //pass the first word(because its chprompt)
+      if (count == 0) //skip the first word(because its chprompt)
       { 
           token = strtok(NULL, " \r");
           count++;
@@ -342,7 +342,6 @@ void ChpromptCommand::execute(SmallShell* smash)
           cout<<"im here"<<endl;
           }
           new_smash_msg = str; 
-          //strcpy(new_smash_msg , token);
           count++;
           break;
       }
@@ -353,8 +352,6 @@ void ChpromptCommand::execute(SmallShell* smash)
   }
   new_smash_msg = new_smash_msg + end_of_prompt;
   smash->smash_msg = new_smash_msg;
-
-  //strncat(new_smash_msg, end_of_prompt, 2); 
 }
 
 void ShowPidCommand::execute(SmallShell* smash)
@@ -547,7 +544,17 @@ JobsList::JobEntry::~JobEntry()
 
 void JobsList::addJob(pid_t pid, char* command, bool is_stopped)
 {
-//    cout << "we are in addJob()" << endl;  
+  /*
+    cout << "addJob() start" << endl;
+    if(jobs->isEmpty())
+    {
+        cout << "jobs list is empty" << endl;  
+    }
+    else
+    {
+      jobs->printJobsList();
+    }
+    */ 
       jobs->removeFinishedJobs();
       int job_id = 1;
       if(!jobs_list->empty()) 
@@ -576,6 +583,17 @@ void JobsList::addJob(pid_t pid, char* command, bool is_stopped)
           cout << "job number " << i++ << " command on list is " << entry->command << endl; 
       }
 */
+
+   /*   
+    cout << "addJob() end" << endl;  
+    if(jobs->isEmpty())
+    {
+        cout << "jobs list is empty" << endl;  
+    }
+    else
+    {
+      jobs->printJobsList();
+    }*/
 }
 
 void JobsList::addStoppedJob(pid_t pid, char* command)
@@ -592,8 +610,10 @@ void JobsList::addStoppedJob(pid_t pid, char* command)
       jobs_list->push_back(job_entry);
 }
 
-void JobsList::removeJobById(int job_id)
+void JobsList::removeJobById(int job_id_to_remove)
 {
+    jobs_list->remove_if([job_id_to_remove](JobEntry* job_entry){return job_entry->job_id == job_id_to_remove;});
+/*
   for (std::list<JobEntry*>::iterator it = jobs_list->begin(); it != jobs_list->end(); ++it)
   {
     JobEntry* job_entry = *it;
@@ -601,47 +621,58 @@ void JobsList::removeJobById(int job_id)
     {
       jobs_list->remove(job_entry);
     }
-  }
+  }*/
 }
 
 void JobsList::removeFinishedJobs()
 {
-  //cout <<"we are on removeFinishedJobs()"<<endl;
-  /*if(!jobs_list->empty())
-  {
-      cout << "remove finished jobs - start: " << "1st job is " << (*(jobs_list->begin()))->command <<endl;
-  }
-  else
-  {
-      cout <<"jobs list is empty"<<endl;
-  }*/
+  list<bool>* remove_indicators = new list<bool>();
   for (std::list<JobEntry*>::iterator it = jobs_list->begin(); it != jobs_list->end(); ++it)
 	{
     JobEntry* job_entry = *it;
     int status;
     bool process_status_is_done = waitpid(job_entry->pid, &status, WNOHANG) > 0;
-    if(process_status_is_done)
-		{
-      cout<<"process " <<job_entry->pid << " is done and removed from job list"<<endl;
-			jobs->removeJobById(job_entry->job_id);
-		}
+    remove_indicators->push_back(process_status_is_done); 
 	}
-  /*if(!jobs_list->empty())
+
+  int job_id_to_remove = 1; 
+  for (std::list<bool>::iterator it = remove_indicators->begin(); it != remove_indicators->end(); ++it)
   {
-      cout << "remove finished jobs - end: " << "1st job is " << (*(jobs_list->begin()))->command <<endl;
+    bool remove_job_entry = *it;
+    if(remove_job_entry)
+    {
+        jobs->removeJobById(job_id_to_remove);
+    }
+    ++job_id_to_remove;
   }
-  else
-  {
-      cout <<"jobs list is empty"<<endl;
-  }*/
+
+  free(remove_indicators);
 }
 
 void JobsList::printJobsList()
 {
-	jobs->removeFinishedJobs();
-	//cout << "we are on print jobs" << endl;
+  /*
+    cout << "we are on print jobs" << endl;
+    cout << "size before remove is " << jobs_list->size() << endl;
+    if(!jobs->isEmpty())
+    {
+      cout << "1st job is " << (*(jobs_list->begin()))->command << endl;
+    }
+  */
+	  jobs->removeFinishedJobs();
+	  //cout << "size after remove is " << jobs_list->size() << endl;
+
+/*
+  int i = 1;
   for (std::list<JobEntry*>::iterator it = jobs_list->begin(); it != jobs_list->end(); ++it)
 	{
+    JobEntry* job_entry = *it;
+    cout << "job element " << i++ << " is " << job_entry->command << endl;
+  }
+*/
+
+  for (std::list<JobEntry*>::iterator it = jobs_list->begin(); it != jobs_list->end(); ++it)
+  {
     JobEntry* job_entry = *it;
     //cout << "job command is: " << job_entry->command << endl;
 		time_t curr_time = time(NULL);
@@ -654,7 +685,7 @@ void JobsList::printJobsList()
       		job_stream << " (stopped)";
     	}
     	cout << job_stream.str() << endl; 
-  	}
+  }
 }
 
 bool JobsList::isEmpty()
@@ -787,8 +818,9 @@ void QuitCommand::execute(SmallShell* smash)
   int length_line = strlen(cmd_line);
   char copy_cmd_line[length_line+1];
   strcpy(copy_cmd_line , cmd_line);
-  this->token = strtok(copy_cmd_line," \r");
-  char* token = strtok(NULL, " \r");
+  char* token = strtok(copy_cmd_line," ");
+
+  token = strtok(NULL, " ");
   if(token == NULL) //no args given, just quit cmd
   {
     exit(1);
@@ -809,7 +841,8 @@ void FgCommand::execute(SmallShell* smash)
  int length_line = strlen(cmd_line);
  char copy_cmd_line[length_line+1];
  strcpy(copy_cmd_line , cmd_line);
- this->token = strtok(copy_cmd_line," \r");
+ char* token = strtok(copy_cmd_line," ");
+ 
  int count = 0;
  int job_number;
  JobsList::JobEntry* wanted_job;
@@ -898,7 +931,8 @@ void BgCommand::execute(SmallShell* smash)
   int length_line = strlen(cmd_line);
   char copy_cmd_line[length_line+1];
   strcpy(copy_cmd_line , cmd_line);
-  this->token = strtok(copy_cmd_line," \r");
+  char* token = strtok(copy_cmd_line," ");
+
   int count = 0;
   int job_num;
   JobsList::JobEntry* stopped_job;
@@ -976,32 +1010,41 @@ void BgCommand::execute(SmallShell* smash)
 
 void TimeoutCommand::execute(SmallShell* smash)
 {
-    strtok(cmd_line, " \r");  //read the timeout command, and inc the pointer to point at duration
-    char* duration = strtok(NULL, " \r");
+	char** args = (char**) malloc((20+2) * sizeof(char*)); //20 is the max num of args + 2 for timeout and duration 
+	int args_num = _parseCommandLine(cmd_line, args);
+	if(args_num < 3)
+	{
+        perror("smash error: timeout: invalid arguments");		
+	}
+    char* duration = args[1];
     int duration_num = 0;
-    if(token != NULL)
+    char* duration_str = (char*)malloc(strlen(duration)+1);
+    strcpy(duration_str, duration);
+    duration_num = atoi(duration_str);
+    free(duration_str);
+    if (duration_num <= 0)
     {
-        char* duration_str = (char*)malloc(strlen(duration)+1);
-        strcpy(duration_str, duration);
-        duration_num = atoi(duration_str);
-        free(duration_str);
-        if (duration_num <= 0)
-        {
-          perror("smash error: timeout: invalid arguments");
-        }
+    	perror("smash error: timeout: invalid arguments");
     }
-    char* command = strtok(NULL, "\0");
-    if (command == NULL)
+    char* command = (char*)malloc(strlen(cmd_line) + 1);
+    int i = 2;
+    strcpy(command, args[2]);
+    while(i != args_num - 1)
     {
-        perror("smash error: timeout: invalid arguments");
+    	strcat(command, args[++i]);
+    	if(i != args_num - 1) 
+    	{
+    		strcat(command , " ");
+    	}
     }
-    alarm(duration_num);   //arranges for a SIGALRM signal to be delivered to the calling process in duration seconds
+    alarm(duration_num);   	//sends SIGALRM signal to the calling process in duration seconds
     smash->alarm_is_set = true;
     TimeoutEntry* timeout_entry = new TimeoutEntry();
     timeout_entry->timestamp = time(NULL);
     timeout_entry->duration = duration_num;
     timeouts->push_back(timeout_entry);
     smash->executeCommand(command);
+    free(args);
 }
 
 void SmallShell::SetPidToTimeoutEntry(pid_t pid)
