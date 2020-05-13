@@ -238,10 +238,7 @@ ExternalCommand::ExternalCommand(char* cmd_line) : Command(cmd_line) {}
 
 void BuiltInCommand::execute(SmallShell* smash)
 { 
-  int length_line = strlen(cmd_line);
-  char copy_cmd_line[length_line+1];
-  strcpy(copy_cmd_line , cmd_line);
-  this->token = strtok(copy_cmd_line," ");
+  
 }
 
 bool SmallShell::cmdIsExternal(const char* cmd_line)
@@ -319,13 +316,17 @@ void SmallShell::executeCommand(char *cmd_line)
 
 void ChpromptCommand::execute(SmallShell* smash)
 {
-  BuiltInCommand::execute(smash); //calls BuiltInCommand::execute
+  int length_line = strlen(cmd_line);
+  char copy_cmd_line[length_line+1];
+  strcpy(copy_cmd_line , cmd_line);
+  char* token = strtok(copy_cmd_line," ");
+  
   string new_smash_msg = smash->smash_msg.c_str();
   string end_of_prompt = "> ";
   int count = 0;
   while (token != NULL)
   {
-      if (count == 0) //pass the first word(because its chprompt)
+      if (count == 0) //skip the first word(because its chprompt)
       { 
           token = strtok(NULL, " ");
           count++;
@@ -335,7 +336,6 @@ void ChpromptCommand::execute(SmallShell* smash)
       {
           std::string str(token);
           new_smash_msg = str; 
-          //strcpy(new_smash_msg , token);
           count++;
           break;
       }
@@ -346,7 +346,6 @@ void ChpromptCommand::execute(SmallShell* smash)
   }
   new_smash_msg = new_smash_msg + end_of_prompt;
   smash->smash_msg = new_smash_msg;
-  //strncat(new_smash_msg, end_of_prompt, 2); 
 }
 
 void ShowPidCommand::execute(SmallShell* smash)
@@ -370,7 +369,7 @@ void CdCommand::execute(SmallShell* smash)
   int length_line = strlen(cmd_line);
   char copy_cmd_line[length_line+1];
   strcpy(copy_cmd_line , cmd_line);
-  this->token = strtok(copy_cmd_line," ");
+  char* token = strtok(copy_cmd_line," ");
   char* path;
   char* newpath;
   char buffer[80];
@@ -710,8 +709,11 @@ void JobsCommand::execute(SmallShell* smash)
 
 void KillCommand::execute(SmallShell* smash)
 {
-  BuiltInCommand::execute(smash); //calls BuiltInCommand::execute
-
+  int length_cmd = strlen(cmd_line);
+  char copy_cmd[length_cmd+1];
+  strcpy(copy_cmd , cmd_line);
+  char* token = strtok(copy_cmd," ");
+ 
   int count = 0;
   int sig_num = 0;
 
@@ -801,8 +803,12 @@ void ExternalCommand::execute(SmallShell* smash)
 
 void QuitCommand::execute(SmallShell* smash)
 {
-  BuiltInCommand::execute(smash);
-  char* token = strtok(NULL, " ");
+  int length_line = strlen(cmd_line);
+  char copy_cmd_line[length_line+1];
+  strcpy(copy_cmd_line , cmd_line);
+  char* token = strtok(copy_cmd_line," ");
+
+  token = strtok(NULL, " ");
   if(token == NULL) //no args given, just quit cmd
   {
     exit(1);
@@ -820,7 +826,11 @@ void QuitCommand::execute(SmallShell* smash)
 
 void FgCommand::execute(SmallShell* smash)
 {
- BuiltInCommand::execute(smash);
+ int length_line = strlen(cmd_line);
+ char copy_cmd_line[length_line+1];
+ strcpy(copy_cmd_line , cmd_line);
+ char* token = strtok(copy_cmd_line," ");
+ 
  int count = 0;
  int job_number;
  JobsList::JobEntry* wanted_job;
@@ -906,7 +916,11 @@ void FgCommand::execute(SmallShell* smash)
 
 void BgCommand::execute(SmallShell* smash)
 { 
-  BuiltInCommand::execute(smash);
+  int length_line = strlen(cmd_line);
+  char copy_cmd_line[length_line+1];
+  strcpy(copy_cmd_line , cmd_line);
+  char* token = strtok(copy_cmd_line," ");
+
   int count = 0;
   int job_num;
   JobsList::JobEntry* stopped_job;
@@ -984,32 +998,41 @@ void BgCommand::execute(SmallShell* smash)
 
 void TimeoutCommand::execute(SmallShell* smash)
 {
-    strtok(cmd_line, " ");  //read the timeout command, and inc the pointer to point at duration
-    char* duration = strtok(NULL, " ");
+	char** args = (char**) malloc((20+2) * sizeof(char*)); //20 is the max num of args + 2 for timeout and duration 
+	int args_num = _parseCommandLine(cmd_line, args);
+	if(args_num < 3)
+	{
+        perror("smash error: timeout: invalid arguments");		
+	}
+    char* duration = args[1];
     int duration_num = 0;
-    if(token != NULL)
+    char* duration_str = (char*)malloc(strlen(duration)+1);
+    strcpy(duration_str, duration);
+    duration_num = atoi(duration_str);
+    free(duration_str);
+    if (duration_num <= 0)
     {
-        char* duration_str = (char*)malloc(strlen(duration)+1);
-        strcpy(duration_str, duration);
-        duration_num = atoi(duration_str);
-        free(duration_str);
-        if (duration_num <= 0)
-        {
-          perror("smash error: timeout: invalid arguments");
-        }
+    	perror("smash error: timeout: invalid arguments");
     }
-    char* command = strtok(NULL, "\0");
-    if (command == NULL)
+    char* command = (char*)malloc(strlen(cmd_line) + 1);
+    int i = 2;
+    strcpy(command, args[2]);
+    while(i != args_num - 1)
     {
-        perror("smash error: timeout: invalid arguments");
+    	strcat(command, args[++i]);
+    	if(i != args_num - 1) 
+    	{
+    		strcat(command , " ");
+    	}
     }
-    alarm(duration_num);   //arranges for a SIGALRM signal to be delivered to the calling process in duration seconds
+    alarm(duration_num);   	//sends SIGALRM signal to the calling process in duration seconds
     smash->alarm_is_set = true;
     TimeoutEntry* timeout_entry = new TimeoutEntry();
     timeout_entry->timestamp = time(NULL);
     timeout_entry->duration = duration_num;
     timeouts->push_back(timeout_entry);
     smash->executeCommand(command);
+    free(args);
 }
 
 void SmallShell::SetPidToTimeoutEntry(pid_t pid)
@@ -1029,7 +1052,7 @@ void RedirectionCommand::execute(SmallShell* smash)
   strcpy(copy_cmd , cmd_line);
   char* cmd_section;
   char* fname;
-  token = strtok(copy_cmd," ");
+  char* token = strtok(copy_cmd," ");
   while(token!=NULL)
   { 
     if(found_sign==true)
@@ -1085,7 +1108,7 @@ void PipeCommand::execute(SmallShell* smash)
   char* cmd_section1;
   char* cmd_section2;
   strcpy(copy_cmd , cmd_line);
-  token = strtok(copy_cmd," ");
+  char* token = strtok(copy_cmd," ");
   while(token!=NULL)
   { 
     if(token[0] == '|')
@@ -1181,7 +1204,7 @@ void CopyCommand::execute(SmallShell* smash)
     int length_line = strlen(cmd_line);
     char copy_cmd_line[length_line+1];
     strcpy(copy_cmd_line , cmd_line);
-    token = strtok(copy_cmd_line," ");
+    char* token = strtok(copy_cmd_line," ");
     bool need_to_wait = _isBackgroundComamnd(cmd_line) == false;
   
     token = strtok(NULL," ");
