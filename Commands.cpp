@@ -980,21 +980,43 @@ void RedirectionCommand::execute(SmallShell* smash)
 {
   char** args = (char**) malloc((MAX_ARGS_NUM) * sizeof(char*));
   int args_num = _parseCommandLine(cmd_line, args);  
-
-  char* fname = (char*) malloc(strlen(args[args_num - 1]) + 1);
-  strcpy(fname, args[args_num - 1]);
-
-  char* cmd_section = (char*) malloc(strlen(cmd_line) + 1);
-  strcpy(cmd_section, args[0]);
-  int i = 1;
-  while(i != args_num - 2)
+   
+  std::string redirection_sign = ">>";
+  if(special_command_num == 0)
   {
-    strcat(cmd_section, args[i++]);
-    if(i != args_num - 2) 
-    {
-      strcat(cmd_section , " ");
-    }
+    redirection_sign = ">";
   }
+
+  int index =0;
+   while(args[index] != redirection_sign )
+   index++;
+
+    char* fname = (char*) malloc(strlen(cmd_line) + 1); 
+    char* cmd_section = (char*) malloc(strlen(cmd_line) + 1);
+
+    int i=0;
+    strcpy(cmd_section,args[i++]); 
+    strcat(cmd_section , " ");
+    while(i < index)
+    {
+        strcat(cmd_section, args[i++]);
+        if(i < index) 
+        {
+          strcat(cmd_section, " ");
+        }   
+    }
+
+   i = index + 1;
+     strcpy(fname,args[i++]);
+     strcat(fname , " ");
+      while(i < args_num)
+    {
+        strcat(fname, args[i++]);
+        if(i < args_num) 
+        {
+          strcat(fname , " ");
+        }   
+    }
 
   if(this->special_command_num == 0)
   {
@@ -1008,7 +1030,14 @@ void RedirectionCommand::execute(SmallShell* smash)
     dup2(newstdout, 1);
     close(newstdout);
   }
-  smash->executeCommand(cmd_section);
+  if(smash->cmdIsExternal(cmd_section))
+      {
+       Command* cmd1 = new ExternalCommand(cmd_section);
+       cmd1->execute(smash);
+      }
+      else{
+      smash->executeCommand(cmd_section);
+      }
   free(cmd_section);
   free(fname);
   free(args);
@@ -1022,7 +1051,7 @@ void PipeCommand::execute(SmallShell* smash)
   char* cmd_section2;
   
   char** args = (char**) malloc((MAX_ARGS_NUM) * sizeof(char*));
-  _parseCommandLine(cmd_line, args);
+  int args_num = _parseCommandLine(cmd_line, args);
   
 
   cmd_section1 = (char*)malloc(strlen(cmd_line)+1);
@@ -1055,10 +1084,10 @@ void PipeCommand::execute(SmallShell* smash)
     i = index + 1;
      strcpy(cmd_section2,args[i++]);
      strcat(cmd_section2 , " ");
-      while(i < 5)
+      while(i < args_num)
     {
         strcat(cmd_section2, args[i++]);
-        if(i < 5) 
+        if(i < args_num) 
         {
           strcat(cmd_section2 , " ");
         }   
@@ -1132,6 +1161,7 @@ void CopyCommand::execute(SmallShell* smash)
 
     char* file2 = (char*)malloc(strlen(args[2])+1);
     strcpy(file2, args[2]);
+
 
     free(args);
 
