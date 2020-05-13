@@ -43,7 +43,6 @@ class PipeCommand : public Command
   PipeCommand(char* cmd_line);
   virtual ~PipeCommand() {}
   void execute(SmallShell* smash) override;
-  int getPipeSignIndex(char** args, int args_num, std::string pipe_sign);
 };
 
 class RedirectionCommand : public Command 

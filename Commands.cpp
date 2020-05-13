@@ -1014,18 +1014,6 @@ void RedirectionCommand::execute(SmallShell* smash)
   free(args);
 }
 
-int PipeCommand::getPipeSignIndex(char** args, int args_num, std::string pipe_sign)
-{
-  int index = 0;
-  for(int i = 0; i < args_num; ++i)
-  {
-    if(strcmp(args[i], pipe_sign.c_str()) == 0)
-    {
-      return index;
-    }
-  }
-  return -1;
-}
 
 void PipeCommand::execute(SmallShell* smash)
 {
@@ -1034,7 +1022,8 @@ void PipeCommand::execute(SmallShell* smash)
   char* cmd_section2;
   
   char** args = (char**) malloc((MAX_ARGS_NUM) * sizeof(char*));
-  int args_num = _parseCommandLine(cmd_line, args);
+  _parseCommandLine(cmd_line, args);
+  
 
   cmd_section1 = (char*)malloc(strlen(cmd_line)+1);
   cmd_section2 = (char*)malloc(strlen(cmd_line)+1);
@@ -1045,10 +1034,14 @@ void PipeCommand::execute(SmallShell* smash)
   {
     pipe_sign = "|";
   }
+   int index =0;
+   while(args[index] != pipe_sign )
+   index++;
+    
 
-    //before pipe sign
-    int index = getPipeSignIndex(args, args_num, pipe_sign);
     int i=0;
+    strcpy(cmd_section1,args[i++]); 
+    strcat(cmd_section1 , " ");
     while(i < index)
     {
         strcat(cmd_section1, args[i++]);
@@ -1060,18 +1053,17 @@ void PipeCommand::execute(SmallShell* smash)
 
     //after pipe sign
     i = index + 1;
-      while(i < args_num)
+     strcpy(cmd_section2,args[i++]);
+     strcat(cmd_section2 , " ");
+      while(i < 5)
     {
         strcat(cmd_section2, args[i++]);
-        if(i < args_num) 
+        if(i < 5) 
         {
           strcat(cmd_section2 , " ");
         }   
     }
   
-  //todo osher - remove
-  cout << "cmd section 1 = "<< cmd_section1 << endl;
-  cout << "cmd section 2 = "<< cmd_section2 << endl;
 
   if(this->special_command_num == 2)
   {
