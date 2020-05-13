@@ -37,6 +37,9 @@ std::string fg_command = "";
 #define EXEC(path, arg) \
   execvp((path), (arg));
 
+#define MAX_ARGS_NUM 20
+#define MAX_COMMAND_LENGTH 80
+
 string _ltrim(const std::string& s)
 {
   size_t start = s.find_first_not_of(WHITESPACE);
@@ -61,6 +64,7 @@ int _parseCommandLine(const char* cmd_line, char** args) {
   for(std::string s; iss >> s; ) {
     args[i] = (char*)malloc(s.length()+1);
     memset(args[i], 0, s.length()+1);
+    //TODO: replace with strcpy(args[i], _trim(s.c_str()));
     strcpy(args[i], s.c_str());
     args[++i] = NULL;
   }
@@ -116,18 +120,36 @@ SmallShell::~SmallShell()
 Command * SmallShell::CreateCommand(char* cmd_line)
 {
   string cmd_s = string(cmd_line);
-  if(cmd_s.find(">") != std::string::npos)
+  if(cmd_s.find(">>") != std::string::npos || cmd_s.find(">") != std::string::npos)
   {
     Command* redirection_cmd = new RedirectionCommand(cmd_line);
+    if(cmd_s.find(">>") != std::string::npos)
+    {
+      redirection_cmd->special_command_num = 1;
+    }
+    else
+    {
+      redirection_cmd->special_command_num = 0;  
+    }    
     redirection_cmd->redirection_flag = true;
     return redirection_cmd;
   }
-  else if(cmd_s.find("|") != std::string::npos)
+
+  else if(cmd_s.find("|") != std::string::npos || cmd_s.find("|&") != std::string::npos)
   {
     Command* pipe_cmd = new PipeCommand(cmd_line);
+    if(cmd_s.find("|&") != std::string::npos)
+    {
+      pipe_cmd->special_command_num = 3;
+    }
+    else
+    {
+      pipe_cmd->special_command_num = 2;  
+    }
     pipe_cmd->pipe_flag = true;
     return pipe_cmd;
   }
+
   else if(cmd_s.find("timeout") == 0)
   {
     Command* timeout_cmd = new TimeoutCommand(cmd_line);
@@ -196,8 +218,7 @@ Command::Command(char* cmd_line)
   this->redirection_flag = false;
   this->pipe_flag = false;
   this->timeout_flag = false;
-  this->special_command_num = -1;
-
+  this->special_command_num =-1;
 }
 
 
@@ -243,10 +264,9 @@ void BuiltInCommand::execute(SmallShell* smash)
 
 bool SmallShell::cmdIsExternal(const char* cmd_line)
 {
-  int length_line = strlen(cmd_line);
-  char copy_cmd_line[length_line+1];
-  strcpy(copy_cmd_line , cmd_line);
-  char* cmd_name= strtok(copy_cmd_line," ");
+  char** args = (char**) malloc(strlen(cmd_line) * sizeof(char*));
+  _parseCommandLine(cmd_line, args);
+  char* cmd_name = args[0];  
   string cmd_st = string(cmd_name);
   bool res = !(cmd_st.find("chprompt") == 0
           ||  cmd_st.find("pwd") == 0
@@ -259,6 +279,7 @@ bool SmallShell::cmdIsExternal(const char* cmd_line)
           ||  cmd_st.find("quit") == 0
           ||  cmd_st.find("cp") == 0    
           ||  cmd_st.find("timeout") == 0);
+  free(args);
   return res;
 }
 
@@ -302,8 +323,12 @@ void SmallShell::executeCommand(char *cmd_line)
 {
 // cout << cmd_line << " - part 1" << endl;
   //cout <<"cmd is "<<cmd_line << endl;
-  Command* cmd = CreateCommand(cmd_line);
   bool need_to_wait = (_isBackgroundComamnd(cmd_line) == false);
+  if(need_to_wait == false)
+  {
+    _removeBackgroundSign(cmd_line); 
+  }
+  Command* cmd = CreateCommand(cmd_line);
   if(cmd->redirection_flag == true || cmd->pipe_flag == true || cmd->timeout_flag == true || cmdIsExternal(cmd_line))
 	{
     executeCommandAux(need_to_wait, cmd);  
@@ -317,41 +342,25 @@ void SmallShell::executeCommand(char *cmd_line)
 
 void ChpromptCommand::execute(SmallShell* smash)
 {
-  string old_msg ="smash";
-  int length_line = strlen(cmd_line);
-  char copy_cmd_line[length_line+1];
-  strcpy(copy_cmd_line , cmd_line);
-  this->token = strtok(copy_cmd_line," \r");
-  string new_smash_msg;
+  char** args = (char**) malloc((MAX_ARGS_NUM) * sizeof(char*)); //20 is the max num of args 
+  int args_num = _parseCommandLine(cmd_line, args);
   string end_of_prompt = "> ";
-  int count = 0;
-  while (token != NULL)
+  string new_smash_msg = ""; 
+  if(args_num == 1)     //chprompt only
   {
-      if (count == 0) //skip the first word(because its chprompt)
-      { 
-          token = strtok(NULL, " \r");
-          count++;
-          continue;
-      }
-      else if (count == 1) //the next prompt we need to print
+      new_smash_msg = "smash";
+  }
+  else
+  {
+      std::string str(args[1]);
+      /*if(str[str.length()-1]=='\r')
       {
-          std::string str(token);
-          if(str[str.length()-1]=='\r')
-          {
-          str.resize(str.length()-1);
-          cout<<"im here"<<endl;
-          }
-          new_smash_msg = str; 
-          count++;
-          break;
-      }
+        str.resize(str.length()-1);
+      }*/
+      new_smash_msg = str; 
   }
-  if (count == 1 )
-  {
-  new_smash_msg = old_msg;
-  }
-  new_smash_msg = new_smash_msg + end_of_prompt;
-  smash->smash_msg = new_smash_msg;
+  smash->smash_msg = new_smash_msg + end_of_prompt;
+  free(args);
 }
 
 void ShowPidCommand::execute(SmallShell* smash)
@@ -361,8 +370,8 @@ void ShowPidCommand::execute(SmallShell* smash)
 
 void GetCurrDirCommand::execute(SmallShell* smash)
 {
- char buff[80];
- char* curr_working_dir = getcwd(buff,80);
+ char buff[MAX_COMMAND_LENGTH];
+ char* curr_working_dir = getcwd(buff, MAX_COMMAND_LENGTH);
  if(curr_working_dir == NULL)
  {
     smash->syscallFailedMsg("getcwd");
@@ -372,42 +381,22 @@ void GetCurrDirCommand::execute(SmallShell* smash)
 
 void CdCommand::execute(SmallShell* smash)
 {
-  int length_line = strlen(cmd_line);
-  char copy_cmd_line[length_line+1];
-  strcpy(copy_cmd_line , cmd_line);
-  this->token = strtok(copy_cmd_line," \r");
-  char* path;
+  char** args = (char**) malloc(MAX_ARGS_NUM * sizeof(char*));
+  int args_num = _parseCommandLine(cmd_line, args);
+  if(args_num > 2)
+  {
+    cout << "smash error: cd: too many arguments" << endl;
+    return;
+  }
+
+  char buffer[MAX_COMMAND_LENGTH];
   string newpath;
-  char buffer[80];
-  path = getcwd(buffer,80);
+  char* path = getcwd(buffer, MAX_COMMAND_LENGTH);
   if(path == NULL)
   {
     smash->syscallFailedMsg("getcwd");
   }
-  int count=0;
-  while(token != NULL)
-  {
-    if (count== 0)
-    {
-      token = strtok(NULL, " \r");
-       std::string str(token);
-       if(str[str.length()-1]=='\r') 
-       str.resize(str.length()-1);
-      newpath = str;
-      count++;
-      continue;
-    }
-    else if(count==1)
-    {
-      count ++;
-      token = strtok(NULL, " \r");
-    }
-    else if(count == 2 )
-    {
-      cout<< "smash error: cd: too many arguments" <<endl;
-      return;
-    }
-  }
+  newpath = args[1];
   if(newpath.find("-") == 0) //go to old path
   {
      if(smash->oldpath.find("0") == 0)
@@ -423,7 +412,6 @@ void CdCommand::execute(SmallShell* smash)
         }
         std::string str1(path);
         smash->oldpath = str1;
-        //strcpy(oldpath, path);
     }
   }
   else if(chdir(newpath.c_str()) != 0)
@@ -434,8 +422,8 @@ void CdCommand::execute(SmallShell* smash)
   {
     std::string str2(path);
     smash->oldpath = str2;
-    //strcpy(oldpath, path);
   }
+  free(args);
 }
 
 JobsList::JobsList()
@@ -715,54 +703,20 @@ void JobsCommand::execute(SmallShell* smash)
 
 void KillCommand::execute(SmallShell* smash)
 {
-  int length_line = strlen(cmd_line);
-  char copy_cmd_line[length_line+1];
-  strcpy(copy_cmd_line , cmd_line);
-  this->token = strtok(copy_cmd_line," \r");
+  char** args = (char**) malloc((MAX_ARGS_NUM) * sizeof(char*));
+  int args_num = _parseCommandLine(cmd_line, args);
 
-  int count = 0;
   int sig_num = 0;
 
-  //check how many args are given
-  while(token != NULL)  
-  { 
-    token = strtok(NULL, " \r");
-    count++;
-    continue;
-  }
-  
-  strtok(cmd_line, " \r"); //reset the pointer
-
-  if(count > 2)
+  if(args_num != 2)
   {
-    perror("smash error: kill: invalid arguments");
+        perror("smash error: kill: invalid arguments");
   }
   else
   {
-    count = 0;
-    //handle the cases
-    while(token != NULL)
-    {
-      if(count== 0)  //cmd
-      {
-        token = strtok(NULL, " \r");
-        if(token == NULL) //there are no args for kill command
-        {
-          perror("smash error: kill: invalid arguments");
-        }
-        count++;
-        continue;
-      }
-      else if(count == 1) //signal
-      {
-        count++;
-        char* signal = (char*)malloc(strlen(token)+1); // "-" followed by signal_num
-        strcpy(signal, token);
-        token = strtok(NULL, " \r");
-        if(token == NULL) //there is no job_id specified
-        {
-          perror("smash error: kill: invalid arguments");
-        }
+        //signal
+        char* signal = (char*)malloc(strlen(args[1])+1); // "-" followed by signal_num
+        strcpy(signal, args[1]);
         const string signal_str(signal);
         if(signal_str.find_first_of("-") != 0)
         {
@@ -779,10 +733,9 @@ void KillCommand::execute(SmallShell* smash)
           }
         }
         free(signal);
-      }
-      else if(count == 2) // we have both signal and job_id
-      {
-        int job_id = atoi(token);
+
+        //job id
+        int job_id = atoi(args[2]);
         JobsList::JobEntry* job_found = jobs->getJobById(job_id);
         if(job_found == NULL)
         {
@@ -794,11 +747,10 @@ void KillCommand::execute(SmallShell* smash)
         stringstream kill_stream ;
         kill_stream << "signal " << sig_num << " was sent to pid " << job_found->pid;
         cout << kill_stream.str() << endl; 
-        token = NULL;
-      }
-    } //end while
-  } //end else (we got 2 or less args)
+  }
+  free(args);
 }
+  
 
 void ExternalCommand::execute(SmallShell* smash)
 { 
@@ -815,90 +767,71 @@ void ExternalCommand::execute(SmallShell* smash)
 
 void QuitCommand::execute(SmallShell* smash)
 {
-  int length_line = strlen(cmd_line);
-  char copy_cmd_line[length_line+1];
-  strcpy(copy_cmd_line , cmd_line);
-  char* token = strtok(copy_cmd_line," ");
-
-  token = strtok(NULL, " ");
-  if(token == NULL) //no args given, just quit cmd
+  char** args = (char**) malloc((2 + MAX_ARGS_NUM) * sizeof(char*)); //20 is the max num of args + 2 for timeout and duration 
+  int args_num = _parseCommandLine(cmd_line, args);
+  if(args_num == 0) //no args given, just quit cmd
   {
+    free(args);
     exit(1);
   }
-  while(token != NULL)
+  else
   {
-    if(strcmp(token, "kill") == 0)
+    if(strcmp(args[1], "kill") == 0)
     {
       jobs->killAllJobs(smash);
+      free(args);
       exit(1);
     }
-    token = strtok(NULL, " \r");  
+    free(args);
   }
 }
 
 void FgCommand::execute(SmallShell* smash)
 {
- int length_line = strlen(cmd_line);
- char copy_cmd_line[length_line+1];
- strcpy(copy_cmd_line , cmd_line);
- char* token = strtok(copy_cmd_line," ");
- 
- int count = 0;
- int job_number;
- JobsList::JobEntry* wanted_job;
- while(token!=NULL)
+  char** args = (char**) malloc((MAX_ARGS_NUM) * sizeof(char*));
+  int args_num = _parseCommandLine(cmd_line, args);
+
+  int job_number;
+  JobsList::JobEntry* wanted_job;
+
+ if (args_num > 2)
  {
-  count++;
-  token=strtok(NULL," \r");
+      perror("smash error: fg: invalid arguments");
  }
- if (count > 2)
+ else if (args_num == 1) //job_id isnt given
  {
-    perror("smash error: fg: invalid arguments");
- }
- else if (count == 1) //no args given
- {
-   bool is_empty = jobs->isEmpty();
-   if (is_empty == true)
+   if (jobs->isEmpty())
    {
-    perror("smash error: fg: jobs list is empty");
+      perror("smash error: fg: jobs list is empty");
    }
    else
    {
-    int last_job_id;
-    wanted_job = jobs->getLastJob(&last_job_id);
-    fg_pid = wanted_job->pid;
-    fg_command = cmd_line;
-    smash->sendSignal(wanted_job->pid, SIGCONT);
-    stringstream job_stream;
-    job_stream << wanted_job->command << " : " << wanted_job->pid << " " << endl;
-    cout << job_stream.str();
-    waitpid(wanted_job->pid, NULL, 0);
-    fg_pid = -1;
-    fg_command = "";
-    jobs->removeJobById(wanted_job->job_id);
-    return;
+      // run the max job_id process on forground 
+      int last_job_id;
+      wanted_job = jobs->getLastJob(&last_job_id);
+      fg_pid = wanted_job->pid;
+      fg_command = cmd_line;
+      smash->sendSignal(wanted_job->pid, SIGCONT);
+      stringstream job_stream;
+      job_stream << wanted_job->command << " : " << wanted_job->pid << " " << endl;
+      cout << job_stream.str();
+      waitpid(wanted_job->pid, NULL, 0);
+      fg_pid = -1;
+      fg_command = "";
+      jobs->removeJobById(wanted_job->job_id);
+      return;
    }
  }
-
- //TODO - the if else structure isnt well defined, else clause is missing
-
- //job_id is given
- strtok(cmd_line, " \r");
- count = 0;
- while(token!=NULL)
+ else   //job_id is given
  {
-  count++;
-  token=strtok(NULL," \r");
-  if (count == 1 && token!=NULL)
-  {
-    char* check_number = (char*)malloc(strlen(token)+1);
-    strcpy(check_number,token);
+    char* check_number = (char*)malloc(strlen(args[1])+1);
+    strcpy(check_number, args[1]);
     job_number = atoi(check_number);
     free(check_number);
     if (job_number == 0 )
     {
      perror("smash error: fg: invalid arguments");
-	  }
+    }
     else
     {
       wanted_job = jobs->getJobById(job_number);
@@ -907,7 +840,7 @@ void FgCommand::execute(SmallShell* smash)
         stringstream job_stream;
         job_stream << "smash error: fg: job-id " << job_number << " does not exist"; 
         perror(job_stream.str().c_str());
-	    }
+      }
       else
       {
        fg_pid = wanted_job->pid;
@@ -920,97 +853,84 @@ void FgCommand::execute(SmallShell* smash)
        fg_pid = -1;
        fg_command = "";
        jobs->removeJobById(wanted_job->job_id);
-	    }
+      }
     }
   }
- }
+  free(args);
 }
 
 void BgCommand::execute(SmallShell* smash)
 { 
-  int length_line = strlen(cmd_line);
-  char copy_cmd_line[length_line+1];
-  strcpy(copy_cmd_line , cmd_line);
-  char* token = strtok(copy_cmd_line," ");
+  char** args = (char**) malloc((MAX_ARGS_NUM) * sizeof(char*));
+  int args_num = _parseCommandLine(cmd_line, args);
 
-  int count = 0;
   int job_num;
   JobsList::JobEntry* stopped_job;
-  while(token!=NULL)
+  
+  if (args_num > 3)
   {
-   count++;
-   token=strtok(NULL," \r");
+      perror("smash error: bg: invalid arguments");
   }
-  if (count > 3)
+  else if(args_num == 1)
   {
-    perror("smash error: bg: invalid arguments");
+    if (jobs->stopped_joblist_is_empty())
+    {
+      perror("smash error: bg: there is no stopped jobs to resume");
+    }
+    else
+    {
+      int last_stopped_job_id;
+      stopped_job = jobs->getLastStoppedJob(&last_stopped_job_id);
+      smash->sendSignal(stopped_job->pid, SIGCONT);
+      stringstream job_stream;
+      job_stream << stopped_job->command << " : " << stopped_job->pid << " " << endl;
+      cout << job_stream.str();
+      stopped_job->is_stopped = false;
+      return;
+    }
   }
-  else if(count==1)
+  else
   {
-   bool is_empty = jobs->stopped_joblist_is_empty();
-   if (is_empty == true)
-   {
-    perror("smash error: bg: there is no stopped jobs to resume");
-   }
-   else
-   {
-    int last_stopped_job_id;
-    stopped_job = jobs->getLastStoppedJob(&last_stopped_job_id);
-    smash->sendSignal(stopped_job->pid, SIGCONT);
-    stringstream job_stream;
-    job_stream << stopped_job->command << " : " << stopped_job->pid << " " << endl;
-    cout << job_stream.str();
-    stopped_job->is_stopped = false;
-    return;
-   }
-  }
-  strtok(cmd_line, " \r");
-  count = 0;
-  while(token!=NULL)
-  {
-   count++;
-   token=strtok(NULL," \r");
-   if (count == 1 && token!=NULL)
-   {
-    char* check_num = (char*)malloc(strlen(token)+1);
-    strcpy(check_num,token);
+    char* check_num = (char*)malloc(strlen(args[1])+1);
+    strcpy(check_num, args[1]);
     job_num = atoi(check_num);
     free(check_num);
+
     if (job_num == 0 )
     {
      perror("smash error: bg: invalid arguments");
-	  }
+    }
     else
     {
-     stopped_job = jobs->getJobById(job_num);
-     if (stopped_job == NULL)
-     {
-      stringstream not_exist_msg;
-      not_exist_msg << "smash error: bg: job-id " << job_num << " does not exist";
-      perror(not_exist_msg.str().c_str());
-	   }
-     else if(stopped_job->is_stopped == false )
-     {
-      stringstream back_msg;
-      back_msg<< "smash error: bg: job-id " << job_num << " is already running in the background";
-      perror(back_msg.str().c_str());
-     }
-     else
-     {
-      smash->sendSignal(stopped_job->pid, SIGCONT);
-      stringstream job_stream;
-      job_stream<< stopped_job->command << " : " << stopped_job->pid << " " << endl;
-      cout << job_stream.str();
-      stopped_job->is_stopped = false;
-	 }
+      stopped_job = jobs->getJobById(job_num);
+      if (stopped_job == NULL)
+      {
+        stringstream not_exist_msg;
+        not_exist_msg << "smash error: bg: job-id " << job_num << " does not exist";
+        perror(not_exist_msg.str().c_str());
+      }
+      else if(stopped_job->is_stopped == false )
+      {
+        stringstream back_msg;
+        back_msg<< "smash error: bg: job-id " << job_num << " is already running in the background";
+        perror(back_msg.str().c_str());
+      }
+      else
+      {
+        smash->sendSignal(stopped_job->pid, SIGCONT);
+        stringstream job_stream;
+        job_stream<< stopped_job->command << " : " << stopped_job->pid << " " << endl;
+        cout << job_stream.str();
+        stopped_job->is_stopped = false;
+      }
     }
-   }
   }
+  free(args);
 }
 
 void TimeoutCommand::execute(SmallShell* smash)
 {
-	char** args = (char**) malloc((20+2) * sizeof(char*)); //20 is the max num of args + 2 for timeout and duration 
+	char** args = (char**) malloc((2 + MAX_ARGS_NUM) * sizeof(char*)); //20 is the max num of args + 2 for timeout and duration 
 	int args_num = _parseCommandLine(cmd_line, args);
 	if(args_num < 3)
 	{
@@ -1058,115 +978,109 @@ void SmallShell::SetPidToTimeoutEntry(pid_t pid)
 
 void RedirectionCommand::execute(SmallShell* smash)
 {
-  bool found_sign= false;
-  int length_cmd = strlen(cmd_line);
-  char copy_cmd[length_cmd+1];
-  strcpy(copy_cmd , cmd_line);
-  char* cmd_section;
-  char* fname;
-  int count3=0;
-  token = strtok(copy_cmd," \r");
-  while(token!=NULL)
-  { 
-    if(found_sign==true)
+  char** args = (char**) malloc((MAX_ARGS_NUM) * sizeof(char*));
+  int args_num = _parseCommandLine(cmd_line, args);  
+
+  char* fname = (char*) malloc(strlen(args[args_num - 1]) + 1);
+  strcpy(fname, args[args_num - 1]);
+
+  char* cmd_section = (char*) malloc(strlen(cmd_line) + 1);
+  strcpy(cmd_section, args[0]);
+  int i = 1;
+  while(i != args_num - 2)
+  {
+    strcat(cmd_section, args[i++]);
+    if(i != args_num - 2) 
     {
-      fname = (char*) malloc(strlen(token) + 1);
-      strcpy(fname,token); 
+      strcat(cmd_section , " ");
     }
-    if(token[0] == '>')
-    { 
-      found_sign = true;
-      if(token[1] == '>')
-      {
-        this->special_command_num = 1;
-      }
-      else
-      {
-        this->special_command_num = 0;
-      }
-    }
-    else if(token[0] != '>' && found_sign==false)
-    {
-     if(count3==0){
-      cmd_section = (char*) malloc(strlen(token) + 1);
-      count3++;
-      }
-      strcat(cmd_section,token);
-      strcat(cmd_section," ");
-	  }
-  token=strtok(NULL," \r");
   }
- if(this->special_command_num == 0)
- {
-  int newstdout = open(fname, O_WRONLY | O_CREAT | O_TRUNC,S_IRWXU);
-  dup2(newstdout, 1);
-  close(newstdout);
- }
- else if(this->special_command_num == 1)
- {
-  int newstdout = open(fname, O_WRONLY | O_CREAT | O_APPEND,S_IRWXU);
-  dup2(newstdout, 1);
-  close(newstdout);
- }
- smash->executeCommand(cmd_section);
- free(cmd_section);
- free(fname);
+
+  if(this->special_command_num == 0)
+  {
+    int newstdout = open(fname, O_WRONLY | O_CREAT | O_TRUNC,S_IRWXU);
+    dup2(newstdout, 1);
+    close(newstdout);
+  }
+  else if(this->special_command_num == 1)
+  {
+    int newstdout = open(fname, O_WRONLY | O_CREAT | O_APPEND,S_IRWXU);
+    dup2(newstdout, 1);
+    close(newstdout);
+  }
+  smash->executeCommand(cmd_section);
+  free(cmd_section);
+  free(fname);
+  free(args);
+}
+
+int PipeCommand::getPipeSignIndex(char** args, int args_num, std::string pipe_sign)
+{
+  int index = 0;
+  for(int i = 0; i < args_num; ++i)
+  {
+    if(strcmp(args[i], pipe_sign.c_str()) == 0)
+    {
+      return index;
+    }
+  }
+  return -1;
 }
 
 void PipeCommand::execute(SmallShell* smash)
 {
- int new_fd;
- int count1=0;
- int count2=0;
- bool found_sign= false;
- int length_cmd = strlen(cmd_line);
-  char copy_cmd[length_cmd+1];
+  int new_fd;
   char* cmd_section1;
   char* cmd_section2;
-  strcpy(copy_cmd , cmd_line);
-  token = strtok(copy_cmd," \r");
-  while(token!=NULL)
-  { 
-    if(token[0] == '|')
-    {
-      if(token[1] == '&')
-      {
-        this->special_command_num = 3;
-        found_sign = true;
-	    }
-      else
-      {
-        this->special_command_num = 2;
-        found_sign = true;
-	    }
-    }
-    else if(token[0] != '|' && found_sign == false)
-    {
-    if(count1==0){
-      cmd_section1 = (char*)malloc(strlen(token)+1);
-      count1++;
-      }
-      strcat(cmd_section1,token);
-      strcat(cmd_section1," ");
-	  }
-    else if(token[0] != '|' && found_sign == true && token[0] != '&')
-    {
-    if(count2==0){
-      cmd_section2 = (char*)malloc(strlen(token)+1);
-      count2++;
-      }
-      strcat(cmd_section2,token);
-      strcat(cmd_section2," ");
-	  }
-    token=strtok(NULL," \r");
-  }
-  if(this->special_command_num == 2)
-  new_fd =1;
-
-  if(this->special_command_num == 3)
-  new_fd =2;
   
+  char** args = (char**) malloc((MAX_ARGS_NUM) * sizeof(char*));
+  int args_num = _parseCommandLine(cmd_line, args);
 
+  cmd_section1 = (char*)malloc(strlen(cmd_line)+1);
+  cmd_section2 = (char*)malloc(strlen(cmd_line)+1);
+  //concat all args before |
+  
+  std::string pipe_sign = "|&";
+  if(special_command_num == 2)
+  {
+    pipe_sign = "|";
+  }
+
+    //before pipe sign
+    int index = getPipeSignIndex(args, args_num, pipe_sign);
+    int i=0;
+    while(i < index)
+    {
+        strcat(cmd_section1, args[i++]);
+        if(i < index) 
+        {
+          strcat(cmd_section1 , " ");
+        }   
+    }
+
+    //after pipe sign
+    i = index + 1;
+      while(i < args_num)
+    {
+        strcat(cmd_section2, args[i++]);
+        if(i < args_num) 
+        {
+          strcat(cmd_section2 , " ");
+        }   
+    }
+  
+  //todo osher - remove
+  cout << "cmd section 1 = "<< cmd_section1 << endl;
+  cout << "cmd section 2 = "<< cmd_section2 << endl;
+
+  if(this->special_command_num == 2)
+  {
+      new_fd = 1;
+  }
+  if(this->special_command_num == 3)
+  {
+      new_fd = 2;
+  }
   int fd[2];
   pipe(fd);
   int pid1=fork();
@@ -1213,22 +1127,24 @@ void PipeCommand::execute(SmallShell* smash)
       waitpid(pid2,NULL,0);
     }
   }
+  free(args);
 }
 
 void CopyCommand::execute(SmallShell* smash)
 {
-    int length_line = strlen(cmd_line);
-    char copy_cmd_line[length_line+1];
-    strcpy(copy_cmd_line , cmd_line);
-    token = strtok(copy_cmd_line," \r");
-    bool need_to_wait = _isBackgroundComamnd(cmd_line) == false;
+    char** args = (char**) malloc((MAX_ARGS_NUM) * sizeof(char*));
+    _parseCommandLine(cmd_line, args);
   
-    token = strtok(NULL," \r");
-    char* file1 = (char*)malloc(strlen(token)+1);
-    strcpy(file1,token);
-    token = strtok(NULL," \r");
-    char* file2 = (char*)malloc(strlen(token)+1);
-    strcpy(file2,token);
+    char* file1 = (char*)malloc(strlen(args[1])+1);
+    strcpy(file1, args[1]);
+
+    char* file2 = (char*)malloc(strlen(args[2])+1);
+    strcpy(file2, args[2]);
+
+    free(args);
+
+    bool need_to_wait = _isBackgroundComamnd(cmd_line) == false;
+
     int pid = fork();
     if(pid > 0) //father
     {
@@ -1274,5 +1190,5 @@ void CopyCommand::execute(SmallShell* smash)
     else
     { 
         perror("can't execute the command");
-    }  
+    }
 }

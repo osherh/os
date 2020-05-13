@@ -14,10 +14,10 @@ class Command
 {
  public:
   char* cmd_line;
-  int special_command_num;
   bool redirection_flag;
   bool pipe_flag;
   bool timeout_flag;
+  int special_command_num;
   Command(char* cmd_line);
   virtual ~Command();
   virtual void execute(SmallShell* smash) = 0;
@@ -43,6 +43,7 @@ class PipeCommand : public Command
   PipeCommand(char* cmd_line);
   virtual ~PipeCommand() {}
   void execute(SmallShell* smash) override;
+  int getPipeSignIndex(char** args, int args_num, std::string pipe_sign);
 };
 
 class RedirectionCommand : public Command 
