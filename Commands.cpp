@@ -264,7 +264,7 @@ bool SmallShell::cmdIsExternal(const char* cmd_line)
   return res;
 }
 
-void SmallShell::executeCommandAux(char* cmd_line, bool need_to_wait, Command* cmd)
+void SmallShell::executeCommandAux(bool need_to_wait, Command* cmd)
 {
     pid_t pid_special = fork();
     if(pid_special > 0) //father
@@ -290,7 +290,7 @@ void SmallShell::executeCommandAux(char* cmd_line, bool need_to_wait, Command* c
     }
     else if (pid_special == 0) //son
    	{
-     	setpgrp();
+     	  setpgrp();
       	cmd->execute(this);
         quick_exit(0);
    	}
@@ -302,11 +302,14 @@ void SmallShell::executeCommandAux(char* cmd_line, bool need_to_wait, Command* c
 
 void SmallShell::executeCommand(char *cmd_line)
 {
+// cout << cmd_line << " - part 1" << endl;
+  //cout <<"cmd is "<<cmd_line << endl;
   Command* cmd = CreateCommand(cmd_line);
   bool need_to_wait = (_isBackgroundComamnd(cmd_line) == false);
   if(cmd->redirection_flag == true || cmd->pipe_flag == true || cmd->timeout_flag == true || cmdIsExternal(cmd_line))
 	{
-    executeCommandAux(cmd_line, need_to_wait, cmd);  
+    executeCommandAux(need_to_wait, cmd);  
+//    cout << cmd_line << " - part 2" << endl;
   }  
   else
   {
@@ -536,7 +539,17 @@ JobsList::JobEntry::~JobEntry()
 
 void JobsList::addJob(pid_t pid, char* command, bool is_stopped)
 {
-//    cout << "we are in addJob()" << endl;  
+  /*
+    cout << "addJob() start" << endl;
+    if(jobs->isEmpty())
+    {
+        cout << "jobs list is empty" << endl;  
+    }
+    else
+    {
+      jobs->printJobsList();
+    }
+    */ 
       jobs->removeFinishedJobs();
       int job_id = 1;
       if(!jobs_list->empty()) 
@@ -565,6 +578,17 @@ void JobsList::addJob(pid_t pid, char* command, bool is_stopped)
           cout << "job number " << i++ << " command on list is " << entry->command << endl; 
       }
 */
+
+   /*   
+    cout << "addJob() end" << endl;  
+    if(jobs->isEmpty())
+    {
+        cout << "jobs list is empty" << endl;  
+    }
+    else
+    {
+      jobs->printJobsList();
+    }*/
 }
 
 void JobsList::addStoppedJob(pid_t pid, char* command)
@@ -581,8 +605,10 @@ void JobsList::addStoppedJob(pid_t pid, char* command)
       jobs_list->push_back(job_entry);
 }
 
-void JobsList::removeJobById(int job_id)
+void JobsList::removeJobById(int job_id_to_remove)
 {
+    jobs_list->remove_if([job_id_to_remove](JobEntry* job_entry){return job_entry->job_id == job_id_to_remove;});
+/*
   for (std::list<JobEntry*>::iterator it = jobs_list->begin(); it != jobs_list->end(); ++it)
   {
     JobEntry* job_entry = *it;
@@ -590,47 +616,58 @@ void JobsList::removeJobById(int job_id)
     {
       jobs_list->remove(job_entry);
     }
-  }
+  }*/
 }
 
 void JobsList::removeFinishedJobs()
 {
-  //cout <<"we are on removeFinishedJobs()"<<endl;
-  /*if(!jobs_list->empty())
-  {
-      cout << "remove finished jobs - start: " << "1st job is " << (*(jobs_list->begin()))->command <<endl;
-  }
-  else
-  {
-      cout <<"jobs list is empty"<<endl;
-  }*/
+  list<bool>* remove_indicators = new list<bool>();
   for (std::list<JobEntry*>::iterator it = jobs_list->begin(); it != jobs_list->end(); ++it)
 	{
     JobEntry* job_entry = *it;
     int status;
     bool process_status_is_done = waitpid(job_entry->pid, &status, WNOHANG) > 0;
-    if(process_status_is_done)
-		{
-      cout<<"process " <<job_entry->pid << " is done and removed from job list"<<endl;
-			jobs->removeJobById(job_entry->job_id);
-		}
+    remove_indicators->push_back(process_status_is_done); 
 	}
-  /*if(!jobs_list->empty())
+
+  int job_id_to_remove = 1; 
+  for (std::list<bool>::iterator it = remove_indicators->begin(); it != remove_indicators->end(); ++it)
   {
-      cout << "remove finished jobs - end: " << "1st job is " << (*(jobs_list->begin()))->command <<endl;
+    bool remove_job_entry = *it;
+    if(remove_job_entry)
+    {
+        jobs->removeJobById(job_id_to_remove);
+    }
+    ++job_id_to_remove;
   }
-  else
-  {
-      cout <<"jobs list is empty"<<endl;
-  }*/
+
+  free(remove_indicators);
 }
 
 void JobsList::printJobsList()
 {
-	jobs->removeFinishedJobs();
-	//cout << "we are on print jobs" << endl;
+  /*
+    cout << "we are on print jobs" << endl;
+    cout << "size before remove is " << jobs_list->size() << endl;
+    if(!jobs->isEmpty())
+    {
+      cout << "1st job is " << (*(jobs_list->begin()))->command << endl;
+    }
+  */
+	  jobs->removeFinishedJobs();
+	  //cout << "size after remove is " << jobs_list->size() << endl;
+
+/*
+  int i = 1;
   for (std::list<JobEntry*>::iterator it = jobs_list->begin(); it != jobs_list->end(); ++it)
 	{
+    JobEntry* job_entry = *it;
+    cout << "job element " << i++ << " is " << job_entry->command << endl;
+  }
+*/
+
+  for (std::list<JobEntry*>::iterator it = jobs_list->begin(); it != jobs_list->end(); ++it)
+  {
     JobEntry* job_entry = *it;
     //cout << "job command is: " << job_entry->command << endl;
 		time_t curr_time = time(NULL);
@@ -643,7 +680,7 @@ void JobsList::printJobsList()
       		job_stream << " (stopped)";
     	}
     	cout << job_stream.str() << endl; 
-  	}
+  }
 }
 
 bool JobsList::isEmpty()
@@ -759,7 +796,7 @@ void ExternalCommand::execute(SmallShell* smash)
 {
     char* args[] = { strdup("bash"), strdup("-c"), cmd_line, NULL};
     execv("/bin/bash", args);
-    cout<<"we are here"<<endl;
+    //cout<<"we are here"<<endl;
 }
 
 void QuitCommand::execute(SmallShell* smash)
