@@ -323,6 +323,7 @@ void SmallShell::executeCommand(char *cmd_line)
 {
 // cout << cmd_line << " - part 1" << endl;
   //cout <<"cmd is "<<cmd_line << endl;
+  
   bool need_to_wait = (_isBackgroundComamnd(cmd_line) == false);
   if(need_to_wait == false)
   {
@@ -708,9 +709,10 @@ void KillCommand::execute(SmallShell* smash)
 
   int sig_num = 0;
 
-  if(args_num != 2)
+  if(args_num != 3)
   {
-        perror("smash error: kill: invalid arguments");
+      cout << "smash error: kill: invalid arguments" << endl;
+      return;
   }
   else
   {
@@ -720,7 +722,8 @@ void KillCommand::execute(SmallShell* smash)
         const string signal_str(signal);
         if(signal_str.find_first_of("-") != 0)
         {
-          perror("smash error: kill: invalid arguments");
+           cout << "smash error: kill: invalid arguments" << endl;
+           return;
         }
         else
         {
@@ -729,7 +732,9 @@ void KillCommand::execute(SmallShell* smash)
           sig_num = atoi(signal_num);
           if(sig_num < 1 || sig_num > 31) // if signal_num isnt a number then sig_num == 0   
           {
-            perror("smash error: kill: invalid arguments");
+            cout << "smash error: kill: invalid arguments" << endl;
+            free(signal);
+            return;
           }
         }
         free(signal);
@@ -740,8 +745,7 @@ void KillCommand::execute(SmallShell* smash)
         if(job_found == NULL)
         {
           stringstream job_stream;
-          job_stream << "smash error: kill: job-id " << job_id << " does not exist";
-          perror(job_stream.str().c_str());
+          cout << "smash error: kill: job-id " << job_id << " does not exist" << endl;
         }
         smash->sendSignal(job_found->pid, sig_num);
         stringstream kill_stream ;
