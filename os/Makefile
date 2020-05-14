@@ -1,31 +1,25 @@
-#TODO: replace ID with your own IDS, for example: 123456789_123456789
-SUBMITTERS := <student1-ID>_<student2-ID>
-COMPILER := g++
-COMPILER_FLAGS := --std=c++11 -Wall
-SRCS := Commands.cpp signals.cpp smash.cpp
-OBJS=$(subst .cpp,.o,$(SRCS))
-HDRS := Commands.h signals.h
-TESTS_INPUTS := $(wildcard test_input*.txt)
-TESTS_OUTPUTS := $(subst input,output,$(TESTS_INPUTS))
-SMASH_BIN := smash
+TESTS := $(wildcard test*.cxx)
+SOURCES := $(filter-out $(TESTS),$(wildcard *.cxx))
+HEADERS := $(wildcard *.h)
+TARGETS := $(TESTS:.cxx=.exe)
+RESULTS := $(TESTS:.cxx=.out)
+GRADE := grade.txt
+CXXFLAGS := -std=c++11 -O3 -Wall -Wextra -Werror -pedantic
 
-test: $(TESTS_OUTPUTS)
+.PHONY: all test clean
+all: $(TARGETS)
 
-$(TESTS_OUTPUTS): $(SMASH_BIN)
-$(TESTS_OUTPUTS): test_output%.txt: test_input%.txt test_expected_output%.txt
-	./$(SMASH_BIN) < $(word 1, $^) > $@
-	diff $@ $(word 2, $^)
-	echo $(word 1, $^) ++PASSED++
+$(TARGETS): %.exe: %.cxx $(SOURCES) $(HEADERS)
+	$(CXX) $(CXXFLAGS) $< $(SOURCES) -o $@
 
-$(SMASH_BIN): $(OBJS)
-	$(COMPILER) $(COMPILER_FLAGS) $^ -o $@
+test: $(GRADE)
 
-$(OBJS): %.o: %.cpp
-	$(COMPILER) $(COMPILER_FLAGS) -c $^
+$(GRADE): $(RESULTS)
+	grep SUCCESS $^ | wc -l > $@
 
-zip: $(SRCS) $(HDRS)
-	zip $(SUBMITTERS).zip $^ submitters.txt Makefile
+$(RESULTS): %.out: %.exe
+	taskset -c 0 ./$< > $@ 2>&1
 
 clean:
-	rm -rf $(SMASH_BIN) $(OBJS) $(TESTS_OUTPUTS) 
-	rm -rf $(SUBMITTERS).zip
+	rm -f $(TARGETS) $(RESULTS) $(GRADE)
+
